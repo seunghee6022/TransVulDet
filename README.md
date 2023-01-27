@@ -1,4 +1,4 @@
-# Integrating Domain Knowledge into Transformer-based Approaches to Vulnerability Detection
+# TransVulDet: Integrating Domain Knowledge into Transformer-based Approaches to Vulnerability Detection
 
 Data Science Master's thesis at LMU 
 
