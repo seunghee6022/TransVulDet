@@ -1,6 +1,6 @@
 # Integrating Domain Knowledge into Transformer-based Approaches to Vulnerability Detection
 
-TransVulDet is a Transformer-based Language Model for Vulnerability Detection aiming to better domain knowledge interation (e.g. CWE hierarchy) with source code datasets.
+TransVulDet is a Transformer-based Language Model for Vulnerability Detection aiming to better domain knowledge integration (e.g. CWE hierarchy) with source code datasets.
 
 ### Dataset
 * Multiclass Vulnerability Dataset (MVD)
