@@ -132,3 +132,10 @@ dmypy.json
 ./data preprocessing/preprocessed datasets
 MSR.csv
 MVD.csv
+
+# shell script
+*.sh
+example_file.sh
+
+# etc
+text.txt
