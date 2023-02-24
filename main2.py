@@ -21,7 +21,7 @@ train_texts, val_texts, train_labels, val_labels = train_test_split(train_texts,
 # Load the pre-trained model and tokenizer
 num_labels = len(set(df['vul'].tolist()))
 # model_lists = ['BERT','CodeBERT','CodeRoBERTa','CodeBERTa' ,'T5','CodeT5', 'GPT','CodeGPT' ]
-model_lists = ['CodeBERT']
+model_lists = ['BERT','CodeBERT','CodeRoBERTa','CodeBERTa']
 
 for model_name in model_lists:
     tokenizer, model = get_tokenizer_and_model(model_name, num_labels)
@@ -38,7 +38,7 @@ for model_name in model_lists:
 
 
     # Define the training arguments
-    EPOCH = 10
+    EPOCH = 5
     training_args = TrainingArguments(
         output_dir='./results',
         num_train_epochs=EPOCH,
@@ -73,7 +73,7 @@ for model_name in model_lists:
     eval_result = trainer.evaluate(val_dataset)
 
     # Save the evaluation results to a CSV file
-    eval_result_file_name = 'evaluation_results_' + model_name +'_'+str(EPOCH)+'.csv'
+    eval_result_file_name = 'evaluation_results_'+ model_name+'.csv'
     with open(eval_result_file_name, mode='w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Evaluation Loss'])

@@ -136,6 +136,7 @@ MVD.csv
 # shell script
 *.sh
 example_file.sh
+run2.sh
 
 # etc
 text.txt
