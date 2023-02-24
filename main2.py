@@ -67,13 +67,13 @@ for model_name in model_lists:
     )
 
     train_result = trainer.train()
-    file_name = "fine-tuned-"+model_name+"-epoch"+str(EPOCH)+".pt"
+    file_name = "fine_tuned_"+model_name+"_epoch"+str(EPOCH)+".pt"
     torch.save(model, file_name)
     # Evaluate the fine-tuned model using the Hugging Face trainer
     eval_result = trainer.evaluate(val_dataset)
 
     # Save the evaluation results to a CSV file
-    eval_result_file_name = 'evaluation_results_'+ model_name+'.csv'
+    eval_result_file_name = 'evaluation_results_' + model_name +'_epoch'+str(EPOCH)+'.csv'
     with open(eval_result_file_name, mode='w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Evaluation Loss'])
