@@ -17,9 +17,19 @@ def get_labels(df):
     return labels
 
 
-def get_texts(df):
+def get_texts(df, model_name=None):
     # Preprocess the data as necessary (e.g., get the texts from the DataFrame)
     texts = df.tolist()
+    if model_name == "CodeT5" or model_name == "T5":
+        # Define the classification task
+        task = 'classification'
+        prefix = task + ':'
+        texts = [prefix + text for text in texts]
+        return texts
+    
+    elif model_name == "GPT2" or model_name == "CodeGPT2":
+        pass
+
     return texts
 
 # Create a PyTorch dataset

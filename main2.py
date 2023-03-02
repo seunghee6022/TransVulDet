@@ -21,9 +21,10 @@ train_texts, val_texts, train_labels, val_labels = train_test_split(train_texts,
 # Load the pre-trained model and tokenizer
 num_labels = len(set(df['vul'].tolist()))
 # model_lists = ['BERT','CodeBERT','CodeRoBERTa','CodeBERTa' ,'T5','CodeT5', 'GPT','CodeGPT' ]
-model_lists = ['BERT','CodeBERT','CodeRoBERTa','CodeBERTa']
+model_lists = ['BERT','CodeRoBERTa','CodeBERTa','CodeBERT']
 
 for model_name in model_lists:
+    print("Start to train ",model_name)
     tokenizer, model = get_tokenizer_and_model(model_name, num_labels)
 
 
@@ -38,7 +39,7 @@ for model_name in model_lists:
 
 
     # Define the training arguments
-    EPOCH = 5
+    EPOCH = 10
     training_args = TrainingArguments(
         output_dir='./results',
         num_train_epochs=EPOCH,
@@ -47,10 +48,10 @@ for model_name in model_lists:
         warmup_steps=500,
         weight_decay=0.01,
         logging_dir='./logs',
-        logging_steps=10,
+        logging_steps=5,
         evaluation_strategy='steps',
         save_total_limit=1,
-        save_steps=10,
+        save_steps=5,
         load_best_model_at_end=True,
         metric_for_best_model='eval_loss',
         greater_is_better=False
@@ -67,13 +68,15 @@ for model_name in model_lists:
     )
 
     train_result = trainer.train()
-    file_name = "fine_tuned_"+model_name+"_epoch"+str(EPOCH)+".pt"
+    file_name = "./results/fine_tuned_"+model_name+"_epoch"+str(EPOCH)+".pt"
     torch.save(model, file_name)
+    # torch.save(model, f"./results/{model_name}_model.pt")
+
     # Evaluate the fine-tuned model using the Hugging Face trainer
     eval_result = trainer.evaluate(val_dataset)
 
     # Save the evaluation results to a CSV file
-    eval_result_file_name = 'evaluation_results_' + model_name +'_epoch'+str(EPOCH)+'.csv'
+    eval_result_file_name = './results/evaluation_results_' + model_name +'_epoch'+str(EPOCH)+'.csv'
     with open(eval_result_file_name, mode='w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Evaluation Loss'])

@@ -24,6 +24,7 @@ num_labels = len(set(df['vul'].tolist()))
 model_lists = ['CodeBERT']
 
 for model_name in model_lists:
+    print(model_name, "training -------------------------------------------------------")
     tokenizer, model = get_tokenizer_and_model(model_name, num_labels)
 
 
@@ -67,13 +68,17 @@ for model_name in model_lists:
     )
 
     train_result = trainer.train()
-    file_name = "fine_tuned_"+model_name+"_epoch"+str(EPOCH)+".pt"
+    file_name = "./results/fine_tuned_" + model_name + "_epoch" + str(EPOCH) + ".pt"
+    print(file_name,"is saved!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1")
     torch.save(model, file_name)
+    torch.save(model, "./results/CodeBERT_model.pt")
+
     # Evaluate the fine-tuned model using the Hugging Face trainer
     eval_result = trainer.evaluate(val_dataset)
 
     # Save the evaluation results to a CSV file
     eval_result_file_name = 'evaluation_results_' + model_name +'_epoch'+str(EPOCH)+'.csv'
+    print("./results/eval_result_file_name is "+ eval_result_file_name)
     with open(eval_result_file_name, mode='w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Evaluation Loss'])
