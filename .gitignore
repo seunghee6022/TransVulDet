@@ -133,6 +133,8 @@ dmypy.json
 MSR.csv
 MVD.csv
 MSR_data_cleaned.csv
+label2CWE.txt
+mvd.txt
 
 # shell script
 *.sh
