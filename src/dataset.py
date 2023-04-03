@@ -1,19 +1,27 @@
 import torch
+import pandas as pd
 from torch.utils.data import Dataset
+import pickle
 
 def get_labels(df):
-    unique_values = set(df.tolist())
+    # load dict to map the unique values to integer indices
+    with open("data preprocessing/preprocessed datasets/total_cwe_dict.txt", "rb") as myFile:
+        total_cwe_dict = pickle.load(myFile)
 
-    # Create a dictionary to map the unique values to integer indices
-    value_to_index = {value: index for index, value in enumerate(unique_values)}
+    # Define the classification labels
+    labels_list = list(total_cwe_dict.keys())
 
     # Create a list of one-hot encoded labels for each row of the DataFrame
     labels = []
     for value in df:
-        index = value_to_index[value]
-        one_hot_label = torch.zeros(len(unique_values))
-        one_hot_label[index] = 1
-        labels.append(one_hot_label)
+        index = total_cwe_dict[value]
+        labels.append(index)
+
+    #for value in df: #one-hot-encoded label
+        # index = total_cwe_dict[value]
+        # one_hot_label = torch.zeros(len(labels_list))
+        # one_hot_label[index] = 1
+        # labels.append(one_hot_label)
     return labels
 
 
@@ -45,5 +53,27 @@ class vulDataset(Dataset):
 
   def __len__(self):
     return len(self.labels)
+
+
+
+
+
+class MyDataset1(Dataset):
+    def __init__(self, csv_file):
+        self.data = pd.read_csv(csv_file)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        code = self.data.iloc[idx, :-1].values.astype('float32')
+        label = self.data.iloc[idx, -1:].values.astype('int64')
+        return code, label
+
+
+csv_file_1 = 'path/to/csv1'
+dataset1 = MyDataset1(csv_file_1)
+dataloader1 = DataLoader(dataset1, batch_size=32, shuffle=True)
+
 
 

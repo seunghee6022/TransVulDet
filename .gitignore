@@ -129,7 +129,10 @@ dmypy.json
 .pyre/
 
 # dataset
-./data preprocessing/preprocessed datasets
+data preprocessing
+data preprocessing/dump/
+data preprocessing/CVEfixes/
+temp
 security-patches-dataset/
 
 MSR.csv
@@ -141,9 +144,8 @@ label2CWE.txt
 mvd.txt
 *.csv
 # shell script
-*.sh
-example_file.sh
-run2.sh
+
+./output
 
 # etc
 text.txt
