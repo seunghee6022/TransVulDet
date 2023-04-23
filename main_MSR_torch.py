@@ -126,18 +126,14 @@ def train_classification(df, model_list, EPOCH, class_type):
                 labels = batch['labels'].to(device) 
                 if class_type == 'multi':
                     labels = labels.argmax(dim=1)
-                    #print("multi label, labels",labels.shape, labels)
   
                 # Forward pass
                 outputs = model(input_ids=input_ids, attention_mask=attention_mask)
                 logits = outputs.logits[:, 1] if class_type == 'binary' else outputs.logits
 
                 output_probs = F.softmax(logits, dim=0)
-                #print("output_probs",output_probs.shape, output_probs)
-                
                 logit_pred_label = (output_probs >= 0.5).float().view(-1) if class_type == 'binary' else torch.argmax(output_probs, dim=1)
-                #print("logit_pred_label", logit_pred_label)
-                
+
                 # compute the loss
                 loss = criterion(logits, labels)
               
@@ -180,25 +176,18 @@ def train_classification(df, model_list, EPOCH, class_type):
                     labels = batch['labels'].to(device)
                     if class_type == 'multi':
                         labels = labels.argmax(dim=1)
-                        print("multi label, labels",labels.shape, labels)
           
                     # Forward pass
                     outputs = model(input_ids=input_ids, attention_mask=attention_mask)
-
                     logits = outputs.logits[:, 1] if class_type == 'binary' else outputs.logits
 
-                    output_probs = F.softmax(logits, dim=0)
-                    #print("output_probs",output_probs.shape, output_probs)
-                    
+                    output_probs = F.softmax(logits, dim=0)                  
                     logit_pred_label = (output_probs >= 0.5).float().view(-1) if class_type == 'binary' else torch.argmax(output_probs, dim=1)
-                    #print("logit_pred_label", logit_pred_label)
 
                     loss = criterion(logits, labels)
-                    
-                 
+
                 val_loss += loss.item() * logits.size(0)
                 val_correct += torch.sum(logit_pred_label == labels).item() 
-                print(f"{epoch} val_correct {val_correct}" )  
             
             val_loss /= len(val_dataset)
             val_acc = val_correct / len(val_dataset)
@@ -219,38 +208,29 @@ def train_classification(df, model_list, EPOCH, class_type):
                 labels = batch['labels'].to(device)
                 if class_type == 'multi':
                     labels = labels.argmax(dim=1)
-                    #print("multi label, labels",labels.shape, labels)
   
                 # Forward pass
                 outputs = model(input_ids=input_ids, attention_mask=attention_mask)
 
                 logits = outputs.logits[:, 1] if class_type == 'binary' else outputs.logits
 
-                output_probs = F.softmax(logits, dim=0)
-                #print("output_probs",output_probs.shape, output_probs)
-                
+                output_probs = F.softmax(logits, dim=0)               
                 logit_pred_label = (output_probs >= 0.5).float().view(-1) if class_type == 'binary' else torch.argmax(output_probs, dim=1)
-                #print("logit_pred_label", logit_pred_label)
 
                 loss = criterion(logits, labels)
               
                 test_loss += loss.item()
-                print("# of logit_pred_label == target_label: ",torch.sum(logit_pred_label ==  labels).item() )
                 test_accuracy += torch.sum(logit_pred_label ==  labels).item() 
                 
                 logit_pred_label_arr = logit_pred_label.cpu().detach().numpy().astype(int)
                 target_label_arr = labels.cpu().detach().numpy().astype(int)
 
-                print("logit_pred_label_arr", type(logit_pred_label_arr),logit_pred_label_arr)
-                print("target_label_arr",type(target_label_arr),target_label_arr)
-                
                 test_precision, test_recall, test_f1, support = precision_recall_fscore_support(logit_pred_label_arr, target_label_arr ,average=average,zero_division=0)
-                print("precision_recall_fscore_support:",test_precision, test_recall, test_f1, support)
                 test_precision += test_precision
                 test_recall += test_recall
                 test_f1 += test_f1
                 
-            print("len(test_loader)",len(test_loader))
+     
             test_loss /= len(test_loader)
             test_accuracy /= len(test_dataset)
             test_precision /= len(test_loader)
