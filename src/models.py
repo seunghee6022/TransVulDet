@@ -32,5 +32,8 @@ def get_tokenizer_and_model(model_name, num_labels):
 
     else:
         print("You put the wrong model name!!!")
+        
+    # Replace the final layer with a new linear layer that outputs the number of classes you want to predict
+    model.classifier = nn.Linear(model.classifier.in_features, num_labels)
 
     return tokenizer, model
