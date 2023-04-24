@@ -79,7 +79,7 @@ def train_classification(df, model_list, EPOCH, class_type):
 
     # 'vul' for binary, 'label' for multiclass
     if class_type == 'multi':
-        label_col_name = 'cve_id'
+        label_col_name = 'cwe_id'
         output_dir = './results/CVE_multi'
         # get cwe label dictionary
         with open("data/total_cwe_dict.txt", "rb") as myFile:
