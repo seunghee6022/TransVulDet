@@ -41,7 +41,6 @@ def create_connection(db_file):
     return conn
 
 
-#DATA_PATH = Path.cwd()/ 'Data' #origin github repo dir
 DATA_PATH = Path.cwd()/ 'Data'
 FIGURE_PATH = Path.cwd() / 'figures'
 RESULT_PATH = Path.cwd() / 'results'
@@ -66,7 +65,13 @@ AND f.file_change_id = mc.file_change_id
 print("-------------------------Query the data and get the dataframe--------------------")
 # Execute the SQL query and fetch the results
 CVEfixes_df = pd.read_sql_query(query, conn)
-df = CVEfixes_df.head(100)
+
+# drop rows based on exception_id_list
+exception_id_list = ['NVD-CWE-Other', 'NVD-CWE-noinfo']
+df = CVEfixes_df[~CVEfixes_df['cwe_id'].isin(exception_id_list)]
+
+#df = df.sample(frac=0.1)
+print(df.columns.values)
 print(df.head(10))
 
 
@@ -76,10 +81,10 @@ model_list = ['CodeBERT']
 
 def train_classification(df, model_list, EPOCH, class_type):
     text_col_name = 'code'
+    label_col_name = 'cwe_id'
 
     # 'vul' for binary, 'label' for multiclass
     if class_type == 'multi':
-        label_col_name = 'cwe_id'
         output_dir = './results/CVE_multi'
         # get cwe label dictionary
         with open("data/total_cwe_dict.txt", "rb") as myFile:
@@ -95,7 +100,6 @@ def train_classification(df, model_list, EPOCH, class_type):
         print("CVEfixes MULTI CLASSIFICATION TRAINING START-------------------------------------------------------")
 
     else:
-        label_col_name = 'vul'
         output_dir = './results/CVE_binary'
         num_labels = 2
         average = 'binary'
@@ -105,7 +109,7 @@ def train_classification(df, model_list, EPOCH, class_type):
     
 
     # Split the dataset into training, validation, and test sets
-    train_texts, test_texts, train_labels, test_labels = train_test_split(get_texts(df[text_col_name]),get_labels(df[label_col_name],num_labels), test_size=0.2)
+    train_texts, test_texts, train_labels, test_labels = train_test_split(get_texts(df[text_col_name]),get_CVEfixes_labels(df[label_col_name],num_labels), test_size=0.2)
     train_texts, val_texts, train_labels, val_labels = train_test_split(train_texts, train_labels, test_size=0.2)
 
     # Load the pre-trained model and tokenizer
@@ -339,6 +343,6 @@ def train_classification(df, model_list, EPOCH, class_type):
         
 
 EPOCH = 1
-train_classification(df, model_list, EPOCH, 'multi')
+train_classification(df, model_list, EPOCH, 'binary')
 
 
