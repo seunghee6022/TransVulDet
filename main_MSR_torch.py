@@ -32,10 +32,10 @@ MVD_df = pd.read_csv('data preprocessing/preprocessed datasets/MVD_labeled.csv')
 print("MSR_df.columns\n",MSR_df.columns)
 print("MVD_df.columns\n",MVD_df.columns)
 
-MSR_df = MSR_df.sample(frac=0.001)
+MSR_df = MSR_df.sample(frac=0.01)
 print(f'# of MSR sample dataset(0.1%): {MSR_df.shape[0]}')
-MVD_df = MVD_df.sample(frac=0.001)
-MVD_df = MVD_df.head(100)
+MVD_df = MVD_df.sample(frac=0.01)
+#MVD_df = MVD_df.head(100)
 print(f'# of MVD sample dataset(0.1%): {MVD_df.shape[0]}')
 
 
@@ -192,7 +192,7 @@ def train_classification(df, model_list, EPOCH, class_type, dataset_name):
     LEARNING_RATE = 1e-5
     EPSILON = 1e-5
     NUM_EPOCHS = EPOCH
-    BATCH_SIZE = 8
+    BATCH_SIZE = 16
   
     for model_name in model_list:
     
@@ -231,6 +231,17 @@ def train_classification(df, model_list, EPOCH, class_type, dataset_name):
         val_dataset = vulDataset(val_encodings, val_labels)
         test_dataset = vulDataset(test_encodings, test_labels)
 
+        # Calculate class weights
+        train_labels_array = np.array(train_labels) if class_type == 'binary' else one_hot_to_labels(train_labels)
+        class_counts = np.bincount(train_labels_array)
+        class_weights = 1.0 / torch.tensor(class_counts, dtype=torch.float)  # inverse frequency
+
+        # Create a weighted sampler
+        weights = class_weights[train_labels_array]
+        print(class_type, "weights", weights)
+        sampler = WeightedRandomSampler(weights, len(weights))
+
+        train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=sampler)
         train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
         val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
         test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
@@ -338,7 +349,7 @@ def train_classification(df, model_list, EPOCH, class_type, dataset_name):
         print("Training completed and the model is saved!")
         
 
-EPOCH = 1
+EPOCH = 10
 train_classification(MVD_df, model_list, EPOCH, 'binary', 'MVD')
 
 
