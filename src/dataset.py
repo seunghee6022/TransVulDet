@@ -16,9 +16,17 @@ def get_labels(df, num_labels):
         one_hot_label = torch.zeros(num_labels)
         one_hot_label[index] = 1
         labels.append(one_hot_label)
-        
-    
-      
+
+    return labels
+
+
+def one_hot_to_labels(one_hot_tensor):
+    # Convert to label tensor
+    labels = torch.argmax(one_hot_tensor, dim=1)
+
+    # Convert to numpy array
+    labels = labels.numpy()
+
     return labels
 
 def get_CVEfixes_labels(df, num_labels):
