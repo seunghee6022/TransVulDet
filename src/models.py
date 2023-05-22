@@ -1,28 +1,30 @@
 from transformers import BertForSequenceClassification, BertTokenizerFast, AutoTokenizer, AutoModelForSequenceClassification
 
 
-def get_tokenizer_and_model(model_name, num_labels):
+def get_tokenizer_and_model(model_name, num_labels, dropout=0.1):
+    print("num_labels for the model: ",num_labels)
     if model_name == 'BERT':
         # Load the pre-trained BERT tokenizer
         tokenizer = BertTokenizerFast.from_pretrained('bert-base-uncased')
         # Load the pre-trained BERT model for sequence classification
-        model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=num_labels)
+        model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=num_labels, hidden_dropout_prob=dropout,attention_probs_dropout_prob=dropout)
 
+    elif model_name == 'CodeBERT':
+        tokenizer = AutoTokenizer.from_pretrained("microsoft/codebert-base")
+        model = AutoModelForSequenceClassification.from_pretrained("microsoft/codebert-base", num_labels=num_labels,hidden_dropout_prob=dropout,attention_probs_dropout_prob=dropout)
+        
     elif model_name == 'CodeRoBERTa':
         # Load the pre-trained tokenizer
         tokenizer = AutoTokenizer.from_pretrained("microsoft/coderoberta-base")
         # Load the pre-trained model for sequence classification
-        model = AutoModelForSequenceClassification.from_pretrained("microsoft/coderoberta-base", num_labels=num_labels)
+        model = AutoModelForSequenceClassification.from_pretrained("microsoft/coderoberta-base", num_labels=num_labels,hidden_dropout_prob=dropout,attention_probs_dropout_prob=dropout)
 
     elif model_name == 'CodeBERTa':
         # Load the pre-trained tokenizer
         tokenizer = AutoTokenizer.from_pretrained("microsoft/codeberta-base")
         # Load the pre-trained model for sequence classification
-        model = AutoModelForSequenceClassification.from_pretrained("microsoft/codeberta-base", num_labels=num_labels)
+        model = AutoModelForSequenceClassification.from_pretrained("microsoft/codeberta-base", num_labels=num_labels,hidden_dropout_prob=dropout,attention_probs_dropout_prob=dropout)
 
-    elif model_name == 'CodeBERT':
-        tokenizer = AutoTokenizer.from_pretrained("microsoft/codebert-base")
-        model = AutoModelForSequenceClassification.from_pretrained("microsoft/codebert-base", num_labels=num_labels)
 
     elif model_name == 'T5':
         pass
@@ -32,8 +34,6 @@ def get_tokenizer_and_model(model_name, num_labels):
 
     else:
         print("You put the wrong model name!!!")
-        
-    # Replace the final layer with a new linear layer that outputs the number of classes you want to predict
-    model.classifier = nn.Linear(model.classifier.in_features, num_labels)
+    print(model)
 
     return tokenizer, model
