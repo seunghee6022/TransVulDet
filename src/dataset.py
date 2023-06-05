@@ -68,9 +68,9 @@ class vulDataset(Dataset):
 
   def __getitem__(self, idx):
   
-    item = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
-    item['labels'] = torch.tensor(self.labels[idx]).to(torch.float32)
-    
+    item = {key: val[idx].clone().detach() for key, val in self.encodings.items()}
+    item['labels'] = torch.tensor(self.labels[idx], dtype=torch.float32).clone().detach().requires_grad_(True)
+
     return item
 
   def __len__(self):
