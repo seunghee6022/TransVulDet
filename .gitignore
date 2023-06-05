@@ -129,9 +129,8 @@ dmypy.json
 .pyre/
 
 # dataset
-data preprocessing
-data preprocessing/dump/
-data preprocessing/CVEfixes/
+data_preprocessing/dump/
+data_preprocessing/CVEfixes/
 temp
 security-patches-dataset/
 
@@ -152,4 +151,4 @@ text.txt
 plots
 output
 ./codeT5.py
-CFD dataset preprocessing.ipynb
+CFD_dataset_preprocessing.ipynb
