@@ -250,13 +250,25 @@ def update_lists_and_plot(params, output_dir, train_losses, val_loss, train_accs
 
 
 # Define the objective function
-def objective(trial, df, output_dir, class_type, model_name, step_size, weight_sampling=False):
+def objective(trial, merged_df, CVEfixes_df, output_dir, class_type, model_name, step_size, weight_sampling=False):
 
     text_col_name, label_col_name, num_labels, average, criterion = get_parameter_by_class_type(class_type)
     print(text_col_name, label_col_name, num_labels, average, criterion)
   
     # Split the dataset into training, validation, and test sets
-    train_texts, test_texts, train_labels, test_labels = train_test_split(get_texts(df[text_col_name]),get_labels(df[label_col_name],num_labels), test_size=0.2)
+    # Preprocess merged_df
+    merged_texts = get_texts(merged_df[text_col_name])
+    merged_labels = get_labels(merged_df[label_col_name], num_labels)
+
+    # Preprocess CVEfixes_df
+    CVEfixes_texts = get_texts(CVEfixes_df[text_col_name])
+    CVEfixes_labels = get_CVEfixes_labels(CVEfixes_df[label_col_name], num_labels)
+
+    # Concatenate the results
+    concatenated_texts = merged_texts + CVEfixes_texts
+    concatenated_labels = merged_labels + CVEfixes_labels
+    print("After merging all three dataset : len(concatenated_texts), len(concatenated_labels)",len(concatenated_texts), len(concatenated_labels))
+    train_texts, test_texts, train_labels, test_labels = train_test_split(concatenated_texts, concatenated_labels, test_size=0.2)
     train_texts, val_texts, train_labels, val_labels = train_test_split(train_texts, train_labels, test_size=0.2)
 
     # Define the search space for the hyperparameters
@@ -337,6 +349,7 @@ if __name__ == "__main__":
     # Load the CSV file as a Pandas DataFrame
     MSR_df = pd.read_csv('data_preprocessing/preprocessed_datasets/MSR_labeled.csv')
     MVD_df = pd.read_csv('data_preprocessing/preprocessed_datasets/MVD_labeled.csv')
+    CVEfixes_df = pd.read_csv('data_preprocessing/preprocessed_datasets/CVEfixes_labeled.csv')
 
     model_name = 'CodeBERT' 
     class_type = 'binary'
@@ -348,6 +361,8 @@ if __name__ == "__main__":
     
     print(f"# of rows in merged_df dataset: {merged_df.shape[0]}")
     print("columns\n",merged_df.columns)
+    print(f"# of rows in CVEfixes_df dataset: {CVEfixes_df.shape[0]}")
+    print("columns\n",CVEfixes_df.columns)
     
    
     # Create a new directory
@@ -359,7 +374,7 @@ if __name__ == "__main__":
     study = optuna.create_study(direction='maximize')
 
     # Run the optimization -
-    study.optimize(lambda trial: objective(trial, merged_df, output_dir, class_type, model_name, step_size, weight_sampling), n_trials=n_trials)
+    study.optimize(lambda trial: objective(trial, merged_df, CVEfixes_df, output_dir, class_type, model_name, step_size, weight_sampling), n_trials=n_trials)
 
     
     if not os.path.exists(output_dir):
