@@ -32,7 +32,7 @@ def one_hot_to_labels(one_hot_tensor):
 def get_CVEfixes_labels(df, num_labels):
    
     # load dict to map the unique values to integer indices
-    with open("data/total_cwe_dict.txt", "rb") as myFile:
+    with open("data_preprocessing/preprocessed_datasets/total_cwe_dict.txt", "rb") as myFile:
         total_cwe_dict = pickle.load(myFile)
 
     # replace CWE IDs based on dictionary, drop the rows if CWE ID is not a key
