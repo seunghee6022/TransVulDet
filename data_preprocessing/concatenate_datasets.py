@@ -19,7 +19,7 @@ MSR_df['dataset_name'] = 'MSR'
 MVD_df['dataset_name'] = 'MVD'
 CVEfixes_df['dataset_name'] = 'CVEfixes'
 
-# remove unnecessary column
+# Remove the 'Unnamed: 0' column
 MSR_df = MSR_df.drop('Unnamed: 0', axis=1)
 MVD_df = MVD_df.drop('Unnamed: 0', axis=1)
 
@@ -29,29 +29,12 @@ print("CVEfixes_df columns\n",CVEfixes_df.columns)
 
 # Concatenate the datasets
 concatenated_df = pd.concat([MSR_df, MVD_df, CVEfixes_df])
-
-# Remove the 'Unnamed: 0' column
-concatenated_df = concatenated_df.drop('Unnamed: 0', axis=1)
-print("after dropping unnamed:0 -> concatenated_df :\n",concatenated_df.head(3))
+print(f"concatenated_df: {concatenated_df.shape}\n{concatenated_df.head(3)}")
 
 # Assuming 'concatenated_df' is your DataFrame
 rows_with_na = concatenated_df[concatenated_df.isna().any(axis=1)]
 print("rows_with_na: \n", rows_with_na.head(3) )
 
-# for index, row in rows_with_na.iterrows():
-#     print(f"NA values found in dataset_name {row['dataset_name']}  cwe_id {row['cwe_id']} row {index}:")
-#     for column, value in row.iteritems():
-#         if pd.isna(value):
-#             print(f"   - NA in column '{column}': value {value} ")
-#             if pd.isna(row['cwe_id']):
-#                 # Handle the case where the value is 'nan'
-#                 concatenated_df.loc[index, 'cwe_id'] = 'non-vulnerable'
-#                 concatenated_df.loc[index, 'label']= 0
-#                 concatenated_df.loc[index, 'vul']= 0
-#             else:
-#                 print(row['cwe_id'], total_cwe_dict[row['cwe_id']])
-#                 concatenated_df.loc[index, 'label']= total_cwe_dict[row['cwe_id']]
-#                 concatenated_df.loc[index, 'vul']= 1
 for index, row in rows_with_na.iterrows():
     print(f"NA values found in dataset_name {row['dataset_name']}  cwe_id {row['cwe_id']} row {index}:")
     if pd.isna(row['cwe_id']):
@@ -82,8 +65,8 @@ else:
 # Set 'label' and 'vul' data type to int
 concatenated_df['label'] = concatenated_df['label'].astype(int)
 concatenated_df['vul'] = concatenated_df['vul'].astype(int)
+print(f"concatenated_df: {concatenated_df.shape}\n{concatenated_df.head(3)}")
 
-print("concatenated_df",concatenated_df.head(5))
 # Split the data into train, validation, and test sets
 train_df, test_df = train_test_split(concatenated_df, test_size=0.2, random_state=42)
 train_df, val_df = train_test_split(train_df, test_size=0.2, random_state=42)
