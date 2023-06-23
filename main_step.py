@@ -250,30 +250,19 @@ def update_lists_and_plot(params, output_dir, train_losses, val_loss, train_accs
 
 
 # Define the objective function
-def objective(trial, merged_df, CVEfixes_df, output_dir, class_type, model_name, step_size, weight_sampling=False):
+def objective(trial, train_df, val_df, test_df, output_dir, class_type, model_name, step_size, weight_sampling=False):
 
     text_col_name, label_col_name, num_labels, average, criterion = get_parameter_by_class_type(class_type)
     print(text_col_name, label_col_name, num_labels, average, criterion)
   
     # Split the dataset into training, validation, and test sets
-    # Preprocess merged_df
-    merged_texts = get_texts(merged_df[text_col_name])
-    merged_labels = get_labels(merged_df[label_col_name], num_labels)
-
-    # Preprocess CVEfixes_df
-    CVEfixes_texts = get_texts(CVEfixes_df[text_col_name])
-    CVEfixes_labels = get_CVEfixes_labels(CVEfixes_df[label_col_name], num_labels)
-
-    # Concatenate the results
-    concatenated_texts = merged_texts + CVEfixes_texts
-    concatenated_labels = merged_labels + CVEfixes_labels
-    print("After merging all three dataset : len(concatenated_texts), len(concatenated_labels)",len(concatenated_texts), len(concatenated_labels))
-    train_texts, test_texts, train_labels, test_labels = train_test_split(concatenated_texts, concatenated_labels, test_size=0.2)
-    train_texts, val_texts, train_labels, val_labels = train_test_split(train_texts, train_labels, test_size=0.2)
+    train_texts, train_labels = get_texts(train_df[text_col_name]), get_labels(train_df[label_col_name], num_labels)
+    val_texts, val_labels = get_texts(val_df[text_col_name]), get_labels(val_df[label_col_name], num_labels)
+    test_texts, test_labels = get_texts(test_df[text_col_name]), get_labels(test_df[label_col_name], num_labels)
 
     # Define the search space for the hyperparameters
     learning_rate = trial.suggest_loguniform('learning_rate', 1e-6, 1e-2)
-    batch_size = trial.suggest_categorical('batch_size', [8, 16, 32])
+    batch_size = 4
     #warmup_step = trial.suggest_categorical('warmup_step', list(range(500, 1001, 100)))
     weight_decay=trial.suggest_loguniform('weight_decay', 1e-3, 1e-2)
     dropout = trial.suggest_uniform('dropout', 0.1, 0.5)
@@ -347,24 +336,25 @@ if __name__ == "__main__":
     random.seed(42)
 
     # Load the CSV file as a Pandas DataFrame
-    MSR_df = pd.read_csv('data_preprocessing/preprocessed_datasets/MSR_labeled.csv')
-    MVD_df = pd.read_csv('data_preprocessing/preprocessed_datasets/MVD_labeled.csv')
-    CVEfixes_df = pd.read_csv('data_preprocessing/preprocessed_datasets/CVEfixes_labeled.csv')
+    train_df = pd.read_csv('data_preprocessing/preprocessed_datasets/train_data.csv')
+    val_df = pd.read_csv('data_preprocessing/preprocessed_datasets/val_data.csv')
+    test_df = pd.read_csv('data_preprocessing/preprocessed_datasets/test_data.csv')
 
+    train_df = train_df.sample(0.e)
+    val_df = val_df.sample(0.3)
+    test_df = test_df.sample(0.3)
+
+    print(f"# of rows in train_df dataset: {train_df.shape[0]}")
+    print(f"# of rows in val_df dataset: {val_df.shape[0]}")
+    print(f"# of rows in test_df dataset: {test_df.shape[0]}")
+    print("columns\n",train_df.columns)
+    
     model_name = 'CodeBERT' 
     class_type = 'binary'
     weight_sampling = True if class_type == 'multi' else False
     n_trials = 50
-    step_size = 1000
+    step_size = 10000 if class_type == 'multi' else 5000
 
-    merged_df = pd.concat([MSR_df, MVD_df], ignore_index=True)
-    
-    print(f"# of rows in merged_df dataset: {merged_df.shape[0]}")
-    print("columns\n",merged_df.columns)
-    print(f"# of rows in CVEfixes_df dataset: {CVEfixes_df.shape[0]}")
-    print("columns\n",CVEfixes_df.columns)
-    
-   
     # Create a new directory
     output_dir = f'results/multi' if class_type == 'multi' else f'results/binary'
     output_dir = f'{output_dir}/Optuna/{model_name}/step_size{step_size}/n_trials{n_trials}'
@@ -374,7 +364,7 @@ if __name__ == "__main__":
     study = optuna.create_study(direction='maximize')
 
     # Run the optimization -
-    study.optimize(lambda trial: objective(trial, merged_df, CVEfixes_df, output_dir, class_type, model_name, step_size, weight_sampling), n_trials=n_trials)
+    study.optimize(lambda trial: objective(trial, train_df, val_df, test_df, output_dir, class_type, model_name, step_size, weight_sampling), n_trials=n_trials)
 
     
     if not os.path.exists(output_dir):
