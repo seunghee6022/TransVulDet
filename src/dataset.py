@@ -29,29 +29,6 @@ def one_hot_to_labels(one_hot_tensor):
 
     return labels
 
-def get_CVEfixes_labels(df, num_labels):
-   
-    # load dict to map the unique values to integer indices
-    with open("data_preprocessing/preprocessed_datasets/total_cwe_dict.txt", "rb") as myFile:
-        total_cwe_dict = pickle.load(myFile)
-
-    # replace CWE IDs based on dictionary, drop the rows if CWE ID is not a key
-    # multi-class
-    if num_labels > 2:
-       
-        print("label df type is ",type(df))
-      
-        # NaN : 0, else map to the total_cwe_dict
-        labels = df.apply(lambda x: total_cwe_dict.get(x) if x in total_cwe_dict.keys() else 0).astype(int).tolist()
-        print("multi",df.head(5), labels[:5])
-        one_hot_labels = torch.eye(num_labels)[labels]
-        return one_hot_labels
-    # binary class    
-    else:
-        labels = df.apply(lambda x: 1 if x in total_cwe_dict else 0).astype(int).tolist()
-        print("binary",df.head(5), labels[:5])
-        return labels
-
 
 def get_texts(df):
     # Preprocess the data as necessary (e.g., get the texts from the DataFrame)
