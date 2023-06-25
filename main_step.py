@@ -14,6 +14,8 @@ import pickle
 
 import matplotlib.pyplot as plt
 
+from imblearn.over_sampling import RandomOverSampler
+
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, precision_score, f1_score, recall_score, confusion_matrix, balanced_accuracy_score
 from transformers import AdamW, get_linear_schedule_with_warmup
