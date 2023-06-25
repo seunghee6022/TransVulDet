@@ -248,17 +248,49 @@ def update_lists_and_plot(params, output_dir, train_losses, val_loss, train_accs
     plt.legend()
     plt.savefig(f'{output_dir}/score_plot_{str(params)}.png')
 
+def get_oversampled_dataset(df, tokenizer, text_col_name, label_col_name, class_type, num_labels):
+    
+    # Split the dataset into training, validation, and test sets
+    texts, labels = get_texts(df[text_col_name]), get_labels(df[label_col_name], num_labels)
+  
+    # Create the RandomOverSampler object - minority for binary and none is for multiclass
+    oversampler = RandomOverSampler(sampling_strategy="minority", random_state=42) if class_type=="binary" else RandomOverSampler(random_state=42)
+    
+    if class_type == 'multi':
+        # Convert one-hot encoded labels back to original format
+        labels = one_hot_to_labels(labels)
 
+    # Keep the same number of samples in texts and labels
+    min_samples = min(len(texts), len(labels))
+    texts = texts[:min_samples]
+    labels = labels[:min_samples]
+
+    # Perform the oversampling (array type)
+    texts = np.array(texts).reshape(-1, 1)
+    resampled_texts, resampled_labels = oversampler.fit_resample(texts, labels)
+    
+    # Tokenize the input texts
+    resampled_encodings = tokenizer(resampled_texts, truncation=True, padding=True, return_tensors='pt')
+    print(f"resampled_encodings shape {resampled_encodings['input_ids'].shape}  type {type(resampled_encodings)}")
+
+    # Create a vulDataset with the oversampled data - multiclass label should be one-hot-encoded
+    if class_type == 'multi':
+        # convert index label to one-hot-encoded labels
+        resampled_one_hot_labels = torch.eye(num_labels)[resampled_labels]
+        resampled_labels = resampled_one_hot_labels
+
+    oversampled_dataset = vulDataset(resampled_encodings, resampled_labels)
+    # Print the length of the dataset
+    dataset_length = len(oversampled_dataset)
+    print("Length of the dataset:", dataset_length)
+
+    return oversampled_dataset
+    
 # Define the objective function
 def objective(trial, train_df, val_df, test_df, output_dir, class_type, model_name, step_size, weight_sampling=False):
 
     text_col_name, label_col_name, num_labels, average, criterion = get_parameter_by_class_type(class_type)
     print(text_col_name, label_col_name, num_labels, average, criterion)
-  
-    # Split the dataset into training, validation, and test sets
-    train_texts, train_labels = get_texts(train_df[text_col_name]), get_labels(train_df[label_col_name], num_labels)
-    val_texts, val_labels = get_texts(val_df[text_col_name]), get_labels(val_df[label_col_name], num_labels)
-    test_texts, test_labels = get_texts(test_df[text_col_name]), get_labels(test_df[label_col_name], num_labels)
 
     # Define the search space for the hyperparameters
     learning_rate = trial.suggest_loguniform('learning_rate', 1e-6, 1e-2)
@@ -282,40 +314,12 @@ def objective(trial, train_df, val_df, test_df, output_dir, class_type, model_na
     # Define the optimizer and loss function
     optimizer = AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay, no_deprecation_warning=True)
     
-    # Tokenize the input texts
-    train_encodings = tokenizer(train_texts, truncation=True, padding=True, return_tensors='pt')
-    val_encodings = tokenizer(val_texts, truncation=True, padding=True, return_tensors='pt')
-    test_encodings = tokenizer(test_texts, truncation=True, padding=True, return_tensors='pt')
+    # Define the dataset and dataloader
+    train_dataset = get_oversampled_dataset(train_df, tokenizer, text_col_name, label_col_name, class_type, num_labels)
+    val_dataset = get_oversampled_dataset(val_df, tokenizer, text_col_name, label_col_name, class_type, num_labels)
+    test_dataset = get_oversampled_dataset(test_df, tokenizer, text_col_name, label_col_name, class_type, num_labels)
     
-    # Define the data loaders
-    train_dataset = vulDataset(train_encodings, train_labels)
-    val_dataset = vulDataset(val_encodings, val_labels)
-    test_dataset = vulDataset(test_encodings, test_labels)
-    
-    if weight_sampling:
-
-        # Calculate class weights
-        train_labels_array = np.array(train_labels) if class_type=='binary' else one_hot_to_labels(train_labels)
-        class_counts = np.bincount(train_labels_array)
-        print("class_counts", len(class_counts),class_counts)
-        class_weights = 1.0 / torch.tensor(class_counts, dtype=torch.float) # inverse frequency
-        print("class_weights", len(class_weights),class_weights)
-        
-        oversampling_factor = 10  # oversampling factor for class 0
-
-        # Set the weight for class 0 to oversampling_factor times its original weight
-        class_weights[0] *= oversampling_factor
-        print("class_weights", len(class_weights),class_weights)
-
-        # Create a weighted sampler
-        weights = class_weights[train_labels_array]
-        print(class_type,"weights",weights)
-        sampler = WeightedRandomSampler(weights, len(weights))
-        
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=sampler)
-    else:
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     
@@ -340,7 +344,7 @@ if __name__ == "__main__":
     val_df = pd.read_csv('data_preprocessing/preprocessed_datasets/val_data.csv')
     test_df = pd.read_csv('data_preprocessing/preprocessed_datasets/test_data.csv')
 
-    train_df = train_df.sample(0.e)
+    train_df = train_df.sample(0.3)
     val_df = val_df.sample(0.3)
     test_df = test_df.sample(0.3)
 
@@ -348,25 +352,23 @@ if __name__ == "__main__":
     print(f"# of rows in val_df dataset: {val_df.shape[0]}")
     print(f"# of rows in test_df dataset: {test_df.shape[0]}")
     print("columns\n",train_df.columns)
-    
-    model_name = 'CodeBERT' 
-    class_type = 'binary'
-    weight_sampling = True if class_type == 'multi' else False
-    n_trials = 50
-    step_size = 10000 if class_type == 'multi' else 5000
 
+    model_name = 'BERT' 
+    class_type = 'multi'
+    step_size = 100 if class_type == 'multi' else 100
+    n_trials = 3
+    
     # Create a new directory
     output_dir = f'results/multi' if class_type == 'multi' else f'results/binary'
-    output_dir = f'{output_dir}/Optuna/{model_name}/step_size{step_size}/n_trials{n_trials}'
+    output_dir = f'{output_dir}/HTO/{model_name}/step_size{step_size}/n_trials{n_trials}'
     os.makedirs(output_dir, exist_ok=True)
     
     # Set up the study
     study = optuna.create_study(direction='maximize')
 
     # Run the optimization -
-    study.optimize(lambda trial: objective(trial, train_df, val_df, test_df, output_dir, class_type, model_name, step_size, weight_sampling), n_trials=n_trials)
+    study.optimize(lambda trial: objective(trial, train_df, val_df, test_df, output_dir, class_type, model_name, step_size), n_trials=n_trials)
 
-    
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     # Retrieve the best hyperparameters
@@ -383,8 +385,8 @@ if __name__ == "__main__":
     trials_dataframe = study.trials_dataframe()
     print(f"trials_dataframe: {trials_dataframe}")
     trials_dataframe.to_csv(f'{output_dir}/trials.csv', index=False)
+
+    print(f"{model_name} with concatenated_df(frac={frac}) with {n_trials} trials, step_size {step_size} on {class_type} classification \nHyperparameter tuning is done!!!")
     
-    print(f"{model_name} with merged_df with {n_trials} trials on {class_type} classification- Hyperparameter tuning is done!!!")
-
-
+ 
 
