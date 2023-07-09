@@ -2,7 +2,9 @@ import pickle
 import torch
 import pandas as pd
 import numpy as np
-from torch.utils.data import Dataset
+from sklearn.utils import shuffle
+from imblearn.over_sampling import RandomOverSampler
+from torch.utils.data import Dataset, IterableDataset
 
 
 def get_labels(df, num_labels):
@@ -36,19 +38,42 @@ def get_texts(df):
     return texts
 
 
-# Create a PyTorch dataset
-class vulDataset(Dataset):
-  def __init__(self, encodings, labels):
-    self.encodings = encodings
-    self.labels = labels
+class OversampledDatasetGenerator(IterableDataset):
+    def __init__(self, df, tokenizer, text_col_name, label_col_name, class_type, num_labels, batch_size=8):
+        self.df = shuffle(df)
+        self.tokenizer = tokenizer
+        self.text_col_name = text_col_name
+        self.label_col_name = label_col_name
+        self.class_type = class_type
+        self.num_labels = num_labels
+        self.batch_size = batch_size
+        self.oversampler = RandomOverSampler(sampling_strategy="minority", random_state=42) if class_type=="binary" else RandomOverSampler(random_state=42)
+        
+    def __iter__(self):
+        for i in range(0, self.df.shape[0], self.batch_size):
+            batch = self.df.iloc[i:i+self.batch_size]
 
+            texts = get_texts(batch[self.text_col_name])
+            labels = get_labels(batch[self.label_col_name], self.num_labels)
 
-  def __getitem__(self, idx):
-  
-    item = {key: val[idx].clone().detach() for key, val in self.encodings.items()}
-    item['labels'] = torch.tensor(self.labels[idx], dtype=torch.float32).clone().detach().requires_grad_(True)
+            if self.class_type == 'multi':
+                labels = one_hot_to_labels(labels)
+            min_samples = min(len(texts), len(labels))
+            texts = texts[:min_samples]
+            labels = labels[:min_samples]
+            texts = np.array(texts).reshape(-1, 1)
+         
+            unique_classes = np.unique(labels)
+            if len(unique_classes) > 1:
+                # Oversample only if there's more than one class.
+                resampled_texts, resampled_labels = self.oversampler.fit_resample(texts, labels)
+            else:
+                # Skip oversampling.
+                resampled_texts, resampled_labels = texts, labels
+            resampled_encodings = self.tokenizer(list(resampled_texts.flatten()), truncation=True, padding=True, return_tensors='pt')
 
-    return item
+            if self.class_type == 'multi':
+                resampled_one_hot_labels = torch.eye(self.num_labels)[resampled_labels]
+                resampled_labels = resampled_one_hot_labels
 
-  def __len__(self):
-    return len(self.labels)
+            yield resampled_encodings, resampled_labels
