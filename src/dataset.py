@@ -64,13 +64,15 @@ class OversampledDatasetGenerator(IterableDataset):
             texts = np.array(texts).reshape(-1, 1)
          
             unique_classes = np.unique(labels)
-            if len(unique_classes) > 1:
-                # Oversample only if there's more than one class.
-                resampled_texts, resampled_labels = self.oversampler.fit_resample(texts, labels)
-            else:
-                # Skip oversampling.
-                resampled_texts, resampled_labels = texts, labels
-            resampled_encodings = self.tokenizer(list(resampled_texts.flatten()), truncation=True, padding=True, return_tensors='pt')
+            binary_continue_cond = self.class_type == 'binary' and len(unique_classes) <= 1
+            multi_continue_cond = self.class_type == 'multi' and len(unique_classes) <= 3
+            if binary_continue_cond or multi_continue_cond:
+                # If only one unique label for binary class batch or few labels for multi class batch, skip the batch.
+                print(f"Continue sampling the batch - class_type:{self.class_type} - # of classes:{len(unique_classes)}")
+                continue
+            
+            # Oversample only if there's more than one class.
+            resampled_texts, resampled_labels = self.oversampler.fit_resample(texts, labels)
 
             if self.class_type == 'multi':
                 resampled_one_hot_labels = torch.eye(self.num_labels)[resampled_labels]
