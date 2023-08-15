@@ -37,6 +37,26 @@ def get_texts(df):
     texts = df.tolist()
     return texts
 
+# Create a PyTorch dataset
+class vulDataset(Dataset):
+  def __init__(self, encodings, labels):
+    self.encodings = encodings
+    self.labels = labels
+    print("Inside vulDataset!!!!!!!!!!!!!")
+    print("self.encodings", self.encodings)
+    print("self.labels", self.labels)
+
+  def __getitem__(self, idx):
+
+    item = {key: val[idx].clone().detach() for key, val in self.encodings.items()}
+    #item['labels'] = torch.tensor(self.labels[idx], dtype=torch.float32).clone().detach()
+    item['labels'] = torch.tensor(self.labels[idx], dtype=torch.float32).clone().detach().requires_grad_(True)
+
+    return item
+
+  def __len__(self):
+    return len(self.labels)
+  
 
 class OversampledDatasetGenerator(IterableDataset):
     def __init__(self, df, tokenizer, text_col_name, label_col_name, class_type, num_labels, batch_size=8):
@@ -62,20 +82,36 @@ class OversampledDatasetGenerator(IterableDataset):
             texts = texts[:min_samples]
             labels = labels[:min_samples]
             texts = np.array(texts).reshape(-1, 1)
-         
+            print("Before labels in OversampledDatasetGenerator:",labels)
             unique_classes = np.unique(labels)
-            binary_continue_cond = self.class_type == 'binary' and len(unique_classes) <= 1
-            multi_continue_cond = self.class_type == 'multi' and len(unique_classes) <= 3
-            if binary_continue_cond or multi_continue_cond:
-                # If only one unique label for binary class batch or few labels for multi class batch, skip the batch.
-                print(f"Continue sampling the batch - class_type:{self.class_type} - # of classes:{len(unique_classes)}")
-                continue
-            
+            print(f"unique_classes:{unique_classes}")
+
+            # binary_continue_cond = self.class_type == 'binary' and len(unique_classes) <= 1
+            # multi_continue_cond = self.class_type == 'multi' and len(unique_classes) <= 3
+
+            if self.class_type == 'binary':
+                if len(unique_classes) <= 1:
+                    continue
+                else:
+                    if labels.count(1) <=2:
+                        continue
+            else:
+                if len(unique_classes) <= 3:
+                    continue
+
+            counter = Counter(labels)
+            print(counter)
+
             # Oversample only if there's more than one class.
             resampled_texts, resampled_labels = self.oversampler.fit_resample(texts, labels)
+            print("After labels in OversampledDatasetGenerator:",resampled_labels)
+                
+            resampled_encodings = self.tokenizer(list(resampled_texts.flatten()), truncation=True, padding=True, return_tensors='pt')
 
             if self.class_type == 'multi':
                 resampled_one_hot_labels = torch.eye(self.num_labels)[resampled_labels]
                 resampled_labels = resampled_one_hot_labels
 
             yield resampled_encodings, resampled_labels
+            
+       
