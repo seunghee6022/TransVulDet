@@ -241,7 +241,7 @@ for line in data_lines:
         print(f"Skipping line: {line}")
 
 # Save the dictionary as a JSON file
-with open('graph_all_paths.json', 'w') as f:
+with open('data_preprocessing/preprocessed_datasets/graph_all_paths.json', 'w') as f:
     json.dump(data_dict, f, indent=4)
 
 

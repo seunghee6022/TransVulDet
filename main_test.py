@@ -21,7 +21,8 @@ from src.dataset import OversampledDatasetGenerator, vulDataset, get_texts, get_
 from src.models import get_tokenizer_and_model
 
 import random
-from focal_loss.focal_loss import FocalLoss
+# from focal_loss.focal_loss import FocalLoss
+from focal_loss import FocalLoss
 
 
 def train(model, class_type, average, device, criterion, optimizer, train_dataloader, writer,step_size=1000):
