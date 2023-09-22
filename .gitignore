@@ -144,8 +144,12 @@ mvd.txt
 *.csv
 # shell script
 
-./output
+# outputs
+outputs
 logs
+
+# backup
+backup
 
 # etc
 text.txt

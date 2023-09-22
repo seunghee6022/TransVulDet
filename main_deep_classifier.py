@@ -44,6 +44,7 @@ class CodeDataset(Dataset):
 
     def one_hot_encode(self, labels):
         one_hot_encoded = []
+        one_hot = [0] * self.num_classes
         for label in labels:
             if label in self.uid_to_dimension:
                 one_hot[self.uid_to_dimension[label]] = 1
@@ -53,7 +54,7 @@ class CodeDataset(Dataset):
                     continue
                 else:
                     label = int(label)
-            one_hot = [0] * self.num_classes
+            
             one_hot[self.uid_to_dimension[label]] = 1
             one_hot_encoded.append(one_hot)
         return one_hot_encoded
@@ -259,7 +260,7 @@ if __name__ == "__main__":
 
     # Define Dataset
     # Split the DataFrame dataset into tran/val/test datasets and Tokenize the "code" column of your DataFrame
-    df_path = 'data_preprocessing/preprocessed_datasets/MVD_100.csv'
+    df_path = 'data_preprocessing/preprocessed_datasets/MVD_2000.csv'
     max_length = 256
     lr= 2e-5
 
@@ -292,7 +293,7 @@ if __name__ == "__main__":
 
     training_args = TrainingArguments(
         per_device_train_batch_size=8,
-        num_train_epochs=10,
+        num_train_epochs=5,
         logging_dir='./logs',
         output_dir='./outputs',
         evaluation_strategy="steps",
