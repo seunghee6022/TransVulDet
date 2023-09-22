@@ -11,43 +11,13 @@ from transformers import BertModel, BertConfig
 
 import networkx as nx
 from torch.utils.data import Dataset
-from sklearn.model_selection import train_test_split
+
 
 from src.trainer import CustomTrainer
-from src.dataset import CodeDataset
-
-def create_graph_from_json(paths_dict_data, max_depth=None):
-    
-    G = nx.DiGraph()
-
-    def add_path_to_graph(path):
-        nodes = list(map(int, path.split('-')))
-        if max_depth:
-            max_level = min(max_depth, len(nodes) - 1)
-            for i in range(max_level):
-                G.add_edge(nodes[i], nodes[i+1])
-        else:
-            for i in range(len(nodes) - 1):
-                G.add_edge(nodes[i], nodes[i+1])
-
-    # Add edges from the paths in the JSON data
-    for key, paths_list in paths_dict_data.items():
-        for path in paths_list:
-            add_path_to_graph(path)
-            
-    return G
+from src.dataset import CodeDataset, split_dataframe
+from src.graph import create_graph_from_json
 
     
-def SplitDataFrame(df_path, test_size=0.3,random_state=42):
-    df = pd.read_csv(df_path)
-    # Split data into train and temp (which will be further split into val and test)
-    train_df, temp_df = train_test_split(df, test_size=0.2, random_state=42)
-
-    # Split temp_df into validation and test datasets
-    val_df, test_df = train_test_split(temp_df, test_size=0.5, random_state=42)
-
-    return train_df, val_df, test_df
-
 class BertWithHierarchicalClassifier(nn.Module):
     def __init__(self, config: BertConfig, input_dim, embedding_dim, graph):
         super(BertWithHierarchicalClassifier, self).__init__()
@@ -215,7 +185,7 @@ if __name__ == "__main__":
     max_length = 256
     lr= 2e-5
 
-    train_df, val_df, test_df = SplitDataFrame(df_path)
+    train_df, val_df, test_df = split_dataframe(df_path)
     
     train_encodings = tokenizer(list(train_df["code"]), truncation=True, padding=True, max_length=max_length, return_tensors="pt")
     val_encodings = tokenizer(list(val_df["code"]), truncation=True, padding=True, max_length=max_length, return_tensors="pt")
