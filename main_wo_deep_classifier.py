@@ -19,14 +19,20 @@ from src.graph import create_graph_from_json
 
     
 class BertWithHierarchicalClassifier(nn.Module):
-    def __init__(self, config: BertConfig, input_dim, embedding_dim, graph):
+    def __init__(self, model_name, input_dim, embedding_dim, graph):
         super(BertWithHierarchicalClassifier, self).__init__()
-        self.model = BertModel(config)
+        self.model = BertModel.from_pretrained(model_name)
+        # self.model.config = config
+        self.model_name = model_name
+        self.graph = graph
+        self.input_dim = input_dim
+        self.embedding_dim = embedding_dim
         
         # Here, replace BERT's linear classifier with your hierarchical classifier
-        self.classifier = HirarchicalClassification(input_dim, embedding_dim, graph)
-        
+        self.classifier = HierarchicalClassifier(self.input_dim, self.embedding_dim, self.graph)
+    print("$$$$$$$$$$$$$$$$$$$$$$INSIDE BertWithHierarchicalClassifier")
     def forward(self, input_ids, attention_mask=None, token_type_ids=None, position_ids=None, head_mask=None, inputs_embeds=None):
+        print("######################## FORWARD")
         outputs = self.model(
             input_ids,
             attention_mask=attention_mask,
@@ -35,16 +41,16 @@ class BertWithHierarchicalClassifier(nn.Module):
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
         )
-        
+        print(f"outputs of self.model:{outputs}")
         # I'm assuming you'd like to use the [CLS] token representation as features for your hierarchical classifier
         cls_output = outputs[1]
         logits = self.classifier(cls_output)
-        
+        print(f"##################logits: {logits.shape}")
         return logits
 
-class HirarchicalClassification(nn.Module):
+class HierarchicalClassifier(nn.Module):
     def __init__(self, input_dim, embedding_dim, graph):
-        super(HirarchicalClassification, self).__init__()
+        super(HierarchicalClassifier, self).__init__()
         self.linear = nn.Linear(input_dim, embedding_dim)
         self.graph = graph
         self._force_prediction_targets = True
@@ -70,14 +76,15 @@ class HirarchicalClassification(nn.Module):
     
         return self.uid_to_dimension
     
+    # predict_embedded funtion
     def forward(self, x):
         return torch.sigmoid(self.linear(x))
     
-    def predict_class(self, x):
-        return (self.forward(x) > 0.5).float()  # Threshold at 0.5
+    # def predict_class(self, x):
+    #     return (self.forward(x) > 0.5).float()  # Threshold at 0.5
     
-    def predict_embedded(self, x):
-        return self.forward(x)
+    # def predict_embedded(self, x):
+    #     return self.forward(x)
     
     # uid_to_dimension --> dict: {uid: #_dim}
     def embed(self, labels):
@@ -123,7 +130,7 @@ class HirarchicalClassification(nn.Module):
 
         embedding = self.embed(ground_truth)
         print("embedding",embedding.shape, embedding)
-        prediction = self.predict_embedded(feature_batch)
+        prediction = self.forward(feature_batch) # forward instead of predict_embedded funtion
         print("prediction", prediction.shape, prediction)
 
         # Clipping predictions for stability
@@ -145,7 +152,7 @@ class HirarchicalClassification(nn.Module):
         print("l2_penalty", l2_penalty)
         print("torch.mean(sum_per_batch_element * weight_batch)", torch.mean(sum_per_batch_element * weight_batch))
         total_loss = torch.mean(sum_per_batch_element * weight_batch) + l2_penalty
-        print("total_loss", total_loss) 
+        print("INSIDE HC LOSS FUNCTION -------total_loss: ", total_loss) 
         return total_loss
     
     
@@ -156,16 +163,29 @@ if __name__ == "__main__":
     with open(paths_file, 'r') as f:
         paths_dict_data = json.load(f)
    
-    G = create_graph_from_json(paths_dict_data, max_depth=None)
+    graph = create_graph_from_json(paths_dict_data, max_depth=None)
 
+    '''
+    Can be generalized to other model & tokenizer later
+    '''
     # Define Tokenizer and Model
-    num_labels = 234  # or however many labels you have
+    batch_size = 8
+    num_labels = graph.number_of_nodes()  # or however many labels you have
+    print("num_labels: ", num_labels)
+    use_hierarchical_classifier = True
     model_name = 'bert-base-uncased'
-    tokenizer = BertTokenizer.from_pretrained(model_name)
-    # tokenizer = RobertaTokenizer.from_pretrained("microsoft/codebert-base") #codebert
+    input_dim = batch_size
+    embedding_dim = num_labels
 
-    config = BertConfig.from_pretrained('bert-base-uncased', num_labels=num_labels)
-    model = BertForSequenceClassification.from_pretrained('bert-base-uncased', config=config)
+    if not use_hierarchical_classifier:
+        config = BertConfig.from_pretrained(model_name, num_labels=num_labels)
+        model = BertForSequenceClassification.from_pretrained(model_name, config=config)
+        
+    else:
+        model = BertWithHierarchicalClassifier( model_name, input_dim, embedding_dim, graph)
+    
+    tokenizer = BertTokenizer.from_pretrained(model_name)
+    print(f"use_hierarchical_classifier:{use_hierarchical_classifier} --> model:{model}")
 
     # Freeze all parameters of the model
     # By setting the requires_grad attribute to False, you can freeze the parameters so they won't be updated during training
@@ -181,7 +201,7 @@ if __name__ == "__main__":
 
     # Define Dataset
     # Split the DataFrame dataset into tran/val/test datasets and Tokenize the "code" column of your DataFrame
-    df_path = 'data_preprocessing/preprocessed_datasets/MVD_2000.csv'
+    df_path = 'data_preprocessing/preprocessed_datasets/MVD_100.csv'
     max_length = 256
     lr= 2e-5
 
@@ -195,36 +215,37 @@ if __name__ == "__main__":
     val_labels = list(val_df["cwe_id"])
     test_labels = list(test_df["cwe_id"])
 
-    HC = HirarchicalClassification(len(train_labels), num_labels, G)
+    HC = HierarchicalClassifier(input_dim, embedding_dim, graph)
     uid_to_dimension = HC.set_uid_to_dimension()
     
     print("uid_to_dimension\n",uid_to_dimension)
 
-    train_dataset = CodeDataset(train_encodings, train_labels, uid_to_dimension)
-    val_dataset = CodeDataset(val_encodings, val_labels, uid_to_dimension)
-    test_dataset = CodeDataset(test_encodings, test_labels, uid_to_dimension)
+    train_dataset = CodeDataset(train_encodings, train_labels, uid_to_dimension, use_hierarchical_classifier)
+    val_dataset = CodeDataset(val_encodings, val_labels, uid_to_dimension, use_hierarchical_classifier)
+    test_dataset = CodeDataset(test_encodings, test_labels, uid_to_dimension, use_hierarchical_classifier)
 
     print(len(train_labels),len(val_labels), len(test_labels) )
-    
+   
     # Define loss function, optimizer and scheduler
     optimizer = AdamW(model.parameters(), lr=lr)
     # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=num_train_steps)
 
 
     training_args = TrainingArguments(
-        per_device_train_batch_size=8,
-        num_train_epochs=5,
+        per_device_train_batch_size=batch_size,
+        num_train_epochs=1,
         logging_dir='./logs',
         output_dir='./outputs',
         evaluation_strategy="steps",
         eval_steps=1,  # Evaluate and log metrics every 500 steps
         logging_steps=1,
-        learning_rate=2e-5,
+        learning_rate=lr,
         remove_unused_columns=False,  # Important for our custom loss function
         disable_tqdm=False,
     )
 
     trainer = CustomTrainer(
+        use_hierarchical_classifier = use_hierarchical_classifier,
         model=model,
         args=training_args,
         train_dataset=train_dataset,
