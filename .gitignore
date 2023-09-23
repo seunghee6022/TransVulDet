@@ -129,11 +129,11 @@ dmypy.json
 .pyre/
 
 # dataset
-data_preprocessing/dump/
-data_preprocessing/CVEfixes/
+data_preprocessing/dump
+data_preprocessing/CVEfixes
+data_preprocessing/MVD
 temp
-security-patches-dataset/
-
+datasets
 MSR.csv
 MSR_new.csv
 MVD.csv
