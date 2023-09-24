@@ -17,8 +17,7 @@ from src.trainer import CustomTrainer
 from src.dataset import CodeDataset, split_dataframe
 from src.graph import create_graph_from_json, set_uid_to_dimension
 from src.classifier import BertWithHierarchicalClassifier
-
-   
+  
 if __name__ == "__main__":
     print(os.getcwd())
     # # Create graph from JSON
@@ -65,9 +64,11 @@ if __name__ == "__main__":
 
     # Define Dataset
     # Split the DataFrame dataset into tran/val/test datasets and Tokenize the "code" column of your DataFrame
-    df_path = 'data_preprocessing/preprocessed_datasets/MVD_100.csv'
+    dataset_name = 'MVD_2000'
+    df_path = f'data_preprocessing/preprocessed_datasets/{dataset_name}.csv'
     max_length = 512
     lr= 1e-4
+    num_epoch = 5
 
     train_df, val_df, test_df = split_dataframe(df_path)
     
@@ -94,7 +95,7 @@ if __name__ == "__main__":
 
     training_args = TrainingArguments(
         per_device_train_batch_size=batch_size,
-        num_train_epochs=5,
+        num_train_epochs=num_epoch,
         logging_dir='./logs',
         output_dir='./outputs',
         evaluation_strategy="steps",
@@ -117,7 +118,7 @@ if __name__ == "__main__":
     trainer.train()
     
     # Define the directory for saving figures
-    figure_dir = os.path.join('figures', f'lr{lr}_bs{batch_size}_MVD100')
+    figure_dir = os.path.join('figures', f'lr{lr}_bs{batch_size}_epoch{num_epoch}_{dataset_name}')
 
     # Create the directory if it doesn't exist
     os.makedirs(figure_dir, exist_ok=True)

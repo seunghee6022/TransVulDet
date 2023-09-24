@@ -1,0 +1,108 @@
+2023-09-24 02:41:22.463288: I tensorflow/core/util/port.cc:110] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2023-09-24 02:41:22.688120: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 AVX512F AVX512_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2023-09-24 02:41:24.808366: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Could not find TensorRT
+/home/jeon_su/.conda/envs/myenv/lib/python3.10/site-packages/transformers/optimization.py:411: FutureWarning: This implementation of AdamW is deprecated and will be removed in a future version. Use the PyTorch implementation torch.optim.AdamW instead, or set `no_deprecation_warning=True` to disable this warning
+  warnings.warn(
+/home/jeon_su/TransVulDet
+num_labels:  234
+all_uids
+ <generator object topological_sort at 0x2ac082dd9690>
+topo_sorted_uids
+ [10000, 0, 1000, 707, 664, 435, 682, 693, 697, 703, 691, 710, 284, 20, 74, 116, 138, 170, 172, 706, 669, 610, 913, 118, 668, 666, 400, 404, 673, 665, 471, 704, 449, 922, 436, 131, 190, 191, 193, 369, 469, 311, 330, 326, 327, 345, 807, 358, 602, 1023, 185, 755, 228, 754, 705, 799, 362, 367, 670, 662, 834, 657, 573, 684, 1177, 758, 269, 285, 287, 749, 1285, 77, 79, 943, 91, 93, 99, 1236, 117, 644, 838, 790, 22, 59, 178, 66, 221, 434, 494, 384, 441, 601, 611, 94, 470, 502, 915, 914, 119, 134, 200, 377, 642, 427, 428, 672, 415, 405, 772, 459, 763, 908, 770, 909, 1188, 681, 843, 829, 444, 467, 680, 312, 319, 344, 331, 335, 338, 328, 346, 347, 352, 924, 184, 187, 241, 252, 354, 476, 248, 617, 667, 674, 835, 250, 475, 912, 676, 266, 271, 862, 552, 732, 863, 306, 1390, 295, 129, 78, 80, 87, 89, 90, 113, 641, 791, 23, 639, 452, 918, 1321, 1336, 120, 787, 788, 125, 786, 805, 823, 824, 203, 209, 359, 538, 378, 379, 73, 426, 565, 324, 613, 825, 407, 401, 762, 457, 774, 98, 798, 776, 506, 273, 527, 276, 277, 279, 281, 288, 290, 294, 303, 305, 307, 1391, 522, 640, 297, 27, 1021, 121, 122, 126, 208, 532, 114, 416, 916, 1333, 590, 321, 425, 350, 304, 521, 759]
+use_hierarchical_classifier:True --> model:BertWithHierarchicalClassifier(
+  (model): BertModel(
+    (embeddings): BertEmbeddings(
+      (word_embeddings): Embedding(30522, 768, padding_idx=0)
+      (position_embeddings): Embedding(512, 768)
+      (token_type_embeddings): Embedding(2, 768)
+      (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+      (dropout): Dropout(p=0.1, inplace=False)
+    )
+    (encoder): BertEncoder(
+      (layer): ModuleList(
+        (0-11): 12 x BertLayer(
+          (attention): BertAttention(
+            (self): BertSelfAttention(
+              (query): Linear(in_features=768, out_features=768, bias=True)
+              (key): Linear(in_features=768, out_features=768, bias=True)
+              (value): Linear(in_features=768, out_features=768, bias=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+            (output): BertSelfOutput(
+              (dense): Linear(in_features=768, out_features=768, bias=True)
+              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+          )
+          (intermediate): BertIntermediate(
+            (dense): Linear(in_features=768, out_features=3072, bias=True)
+            (intermediate_act_fn): GELUActivation()
+          )
+          (output): BertOutput(
+            (dense): Linear(in_features=3072, out_features=768, bias=True)
+            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+        )
+      )
+    )
+    (pooler): BertPooler(
+      (dense): Linear(in_features=768, out_features=768, bias=True)
+      (activation): Tanh()
+    )
+  )
+  (classifier): HierarchicalClassifier(
+    (linear): Linear(in_features=768, out_features=234, bias=True)
+    (sigmoid): Sigmoid()
+  )
+)
+HierarchicalClassifier(
+  (linear): Linear(in_features=768, out_features=234, bias=True)
+  (sigmoid): Sigmoid()
+)
+Parameter containing:
+tensor([[0., 0., 0.,  ..., 0., 0., 0.],
+        [0., 0., 0.,  ..., 0., 0., 0.],
+        [0., 0., 0.,  ..., 0., 0., 0.],
+        ...,
+        [0., 0., 0.,  ..., 0., 0., 0.],
+        [0., 0., 0.,  ..., 0., 0., 0.],
+        [0., 0., 0.,  ..., 0., 0., 0.]])
+Parameter containing:
+tensor([0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+        0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+        0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+        0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+        0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+        0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+        0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+        0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+        0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+        0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.])
+uid_to_dimension
+ {10000: 0, 0: 1, 1000: 2, 707: 3, 664: 4, 435: 5, 682: 6, 693: 7, 697: 8, 703: 9, 691: 10, 710: 11, 284: 12, 20: 13, 74: 14, 116: 15, 138: 16, 170: 17, 172: 18, 706: 19, 669: 20, 610: 21, 913: 22, 118: 23, 668: 24, 666: 25, 400: 26, 404: 27, 673: 28, 665: 29, 471: 30, 704: 31, 449: 32, 922: 33, 436: 34, 131: 35, 190: 36, 191: 37, 193: 38, 369: 39, 469: 40, 311: 41, 330: 42, 326: 43, 327: 44, 345: 45, 807: 46, 358: 47, 602: 48, 1023: 49, 185: 50, 755: 51, 228: 52, 754: 53, 705: 54, 799: 55, 362: 56, 367: 57, 670: 58, 662: 59, 834: 60, 657: 61, 573: 62, 684: 63, 1177: 64, 758: 65, 269: 66, 285: 67, 287: 68, 749: 69, 1285: 70, 77: 71, 79: 72, 943: 73, 91: 74, 93: 75, 99: 76, 1236: 77, 117: 78, 644: 79, 838: 80, 790: 81, 22: 82, 59: 83, 178: 84, 66: 85, 221: 86, 434: 87, 494: 88, 384: 89, 441: 90, 601: 91, 611: 92, 94: 93, 470: 94, 502: 95, 915: 96, 914: 97, 119: 98, 134: 99, 200: 100, 377: 101, 642: 102, 427: 103, 428: 104, 672: 105, 415: 106, 405: 107, 772: 108, 459: 109, 763: 110, 908: 111, 770: 112, 909: 113, 1188: 114, 681: 115, 843: 116, 829: 117, 444: 118, 467: 119, 680: 120, 312: 121, 319: 122, 344: 123, 331: 124, 335: 125, 338: 126, 328: 127, 346: 128, 347: 129, 352: 130, 924: 131, 184: 132, 187: 133, 241: 134, 252: 135, 354: 136, 476: 137, 248: 138, 617: 139, 667: 140, 674: 141, 835: 142, 250: 143, 475: 144, 912: 145, 676: 146, 266: 147, 271: 148, 862: 149, 552: 150, 732: 151, 863: 152, 306: 153, 1390: 154, 295: 155, 129: 156, 78: 157, 80: 158, 87: 159, 89: 160, 90: 161, 113: 162, 641: 163, 791: 164, 23: 165, 639: 166, 452: 167, 918: 168, 1321: 169, 1336: 170, 120: 171, 787: 172, 788: 173, 125: 174, 786: 175, 805: 176, 823: 177, 824: 178, 203: 179, 209: 180, 359: 181, 538: 182, 378: 183, 379: 184, 73: 185, 426: 186, 565: 187, 324: 188, 613: 189, 825: 190, 407: 191, 401: 192, 762: 193, 457: 194, 774: 195, 98: 196, 798: 197, 776: 198, 506: 199, 273: 200, 527: 201, 276: 202, 277: 203, 279: 204, 281: 205, 288: 206, 290: 207, 294: 208, 303: 209, 305: 210, 307: 211, 1391: 212, 522: 213, 640: 214, 297: 215, 27: 216, 1021: 217, 121: 218, 122: 219, 126: 220, 208: 221, 532: 222, 114: 223, 416: 224, 916: 225, 1333: 226, 590: 227, 321: 228, 425: 229, 350: 230, 304: 231, 521: 232, 759: 233}
+1600 200 200
+  0%|          | 0/1000 [00:00<?, ?it/s]/home/jeon_su/TransVulDet/src/dataset.py:154: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  item = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
+inputs['labels'] torch.Size([8, 234])
+batch_size 8 num_labels 234
+Traceback (most recent call last):
+  File "/home/jeon_su/TransVulDet/main_deep_classifier.py", line 119, in <module>
+    trainer.train()
+  File "/home/jeon_su/.conda/envs/myenv/lib/python3.10/site-packages/transformers/trainer.py", line 1553, in train
+    return inner_training_loop(
+  File "/home/jeon_su/.conda/envs/myenv/lib/python3.10/site-packages/transformers/trainer.py", line 1835, in _inner_training_loop
+    tr_loss_step = self.training_step(model, inputs)
+  File "/home/jeon_su/.conda/envs/myenv/lib/python3.10/site-packages/transformers/trainer.py", line 2679, in training_step
+    loss = self.compute_loss(model, inputs)
+  File "/home/jeon_su/TransVulDet/src/trainer.py", line 18, in compute_loss
+    loss, logits = model(inputs['input_ids'], attention_mask=inputs['attention_mask'], labels=inputs['labels'])
+  File "/home/jeon_su/.conda/envs/myenv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1501, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/jeon_su/TransVulDet/src/classifier.py", line 37, in forward
+    loss = self.loss(logits, labels)
+  File "/home/jeon_su/TransVulDet/src/classifier.py", line 113, in loss
+    embedding * torch.log(clipped_probs) +
+RuntimeError: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu!
+  0%|          | 0/1000 [00:01<?, ?it/s]
