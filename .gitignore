@@ -142,7 +142,9 @@ MSR_data_cleaned.csv
 label2CWE.txt
 mvd.txt
 *.csv
+
 # shell script
+*.sh
 
 # outputs
 outputs
