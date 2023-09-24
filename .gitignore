@@ -134,11 +134,6 @@ data_preprocessing/CVEfixes
 data_preprocessing/MVD
 temp
 datasets
-MSR.csv
-MSR_new.csv
-MVD.csv
-SPD.csv
-MSR_data_cleaned.csv
 label2CWE.txt
 mvd.txt
 *.csv

@@ -22,6 +22,8 @@ class BertWithHierarchicalClassifier(nn.Module):
         self.loss_weights = torch.ones(embedding_dim)
 
     def forward(self, input_ids, attention_mask=None, labels=None, token_type_ids=None, position_ids=None, head_mask=None, inputs_embeds=None):
+        print("INSIDE BertWithHierarchicalClassifier Forward")
+        print("labels---",labels.shape, labels)
         outputs = self.model(
             input_ids,
             attention_mask=attention_mask,
@@ -33,11 +35,13 @@ class BertWithHierarchicalClassifier(nn.Module):
         # use the [CLS] token representation as features for hierarchical classifier
         cls_output = outputs[1]
         logits = self.classifier(cls_output)
+        print("logits---",logits.shape)
         if labels is not None:
             loss = self.loss(logits, labels)
+            print("labels is not None--- loss:",loss)
             return loss, logits
-        
-        return logits
+        else:
+            return logits
     
     def one_hot_labels_to_cweIDs_labels(self, ground_truth):
             '''

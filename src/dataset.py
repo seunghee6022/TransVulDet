@@ -135,18 +135,19 @@ class CodeDataset(Dataset):
 
     def one_hot_encode(self, labels):
         one_hot_encoded = []
-        one_hot = [0] * self.num_classes
         for label in labels:
+            one_hot = [0] * self.num_classes
             if label in self.uid_to_dimension:
                 one_hot[self.uid_to_dimension[label]] = 1
             else:
                 print(f"Warning: Label {type(label)}{label} not found in uid_to_dimension!")
                 if ', CWE' in label:
+                    print("Wrong label", label)
                     continue
                 else:
+                    print("String label:",label)
                     label = int(label)
             
-            one_hot[self.uid_to_dimension[label]] = 1
             one_hot_encoded.append(one_hot)
         return one_hot_encoded
 
