@@ -1,5 +1,6 @@
 from transformers import Trainer
 from torch.nn import BCEWithLogitsLoss
+from sklearn.metrics import accuracy_score, f1_score
 
 class CustomTrainer(Trainer):
     def __init__(self, use_hierarchical_classifier=False, *args, **kwargs):
@@ -25,3 +26,10 @@ class CustomTrainer(Trainer):
         print("labels shape: ", inputs['labels'].shape)
         print("loss:", loss)
         return (loss, logits) if return_outputs else loss
+    
+    def compute_metrics(p):
+        predictions, labels = p.predictions, p.label_ids
+        predictions = np.argmax(predictions, axis=1)
+        acc = accuracy_score(labels, predictions)
+        f1 = f1_score(labels, predictions, average='weighted')
+        return {"accuracy": acc, "f1_score": f1}
