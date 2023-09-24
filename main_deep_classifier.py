@@ -9,8 +9,9 @@ from transformers import TrainingArguments
 from transformers import AdamW, get_linear_schedule_with_warmup
 from transformers import BertModel, BertConfig
 
+import matplotlib.pyplot as plt
+
 import networkx as nx
-from torch.utils.data import Dataset
 
 from src.trainer import CustomTrainer
 from src.dataset import CodeDataset, split_dataframe
@@ -64,7 +65,7 @@ if __name__ == "__main__":
 
     # Define Dataset
     # Split the DataFrame dataset into tran/val/test datasets and Tokenize the "code" column of your DataFrame
-    df_path = 'data_preprocessing/preprocessed_datasets/MVD_1000.csv'
+    df_path = 'data_preprocessing/preprocessed_datasets/MVD_100.csv'
     max_length = 512
     lr= 1e-4
 
@@ -93,7 +94,7 @@ if __name__ == "__main__":
 
     training_args = TrainingArguments(
         per_device_train_batch_size=batch_size,
-        num_train_epochs=1,
+        num_train_epochs=5,
         logging_dir='./logs',
         output_dir='./outputs',
         evaluation_strategy="steps",
@@ -114,5 +115,52 @@ if __name__ == "__main__":
     )
 
     trainer.train()
+    
+    # Define the directory for saving figures
+    figure_dir = os.path.join('figures', f'lr{lr}_bs{batch_size}_MVD100')
 
- 
+    # Create the directory if it doesn't exist
+    os.makedirs(figure_dir, exist_ok=True)
+    # Evaluate the model on the test dataset
+    eval_results = trainer.evaluate(test_dataset)
+
+    # Print the evaluation results
+    print("Evaluation results:", eval_results)
+
+    # Access the loss and metrics from the trainer's history
+    train_losses = trainer.state.log_history["loss"]
+    val_accs = trainer.state.log_history["eval_accuracy"]
+    val_f1_scores = trainer.state.log_history["eval_f1_score"]
+
+    # Plot and save the loss curve
+    plt.figure(figsize=(12, 6))
+    plt.plot(train_losses, label="Training Loss")
+    plt.xlabel("Step")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.savefig(os.path.join(figure_dir, 'loss_curve.png'))
+    plt.close()
+
+    # Plot and save the accuracy curve
+    plt.figure(figsize=(12, 6))
+    plt.plot(val_accs, label="Validation Accuracy")
+    plt.xlabel("Step")
+    plt.ylabel("Accuracy")
+    plt.legend()
+    plt.savefig(os.path.join(figure_dir, 'accuracy_curve.png'))
+    plt.close()
+
+    # Plot and save the F1 score curve
+    plt.figure(figsize=(12, 6))
+    plt.plot(val_f1_scores, label="Validation F1 Score")
+    plt.xlabel("Step")
+    plt.ylabel("F1 Score")
+    plt.legend()
+    plt.savefig(os.path.join(figure_dir, 'f1_score_curve.png'))
+    plt.close()
+
+    # Print final evaluation metrics
+    final_val_acc = val_accs[-1]
+    final_val_f1 = val_f1_scores[-1]
+    print(f"Final Validation Accuracy: {final_val_acc:.4f}")
+    print(f"Final Validation F1 Score: {final_val_f1:.4f}")
