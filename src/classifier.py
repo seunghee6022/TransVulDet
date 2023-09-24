@@ -2,10 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from transformers import BertModel, BertConfig
-
 import networkx as nx
-
-
 
 class BertWithHierarchicalClassifier(nn.Module):
     def __init__(self, model_name, embedding_dim, uid_to_dimension, graph):
