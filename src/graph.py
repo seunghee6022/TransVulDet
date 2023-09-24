@@ -129,6 +129,15 @@ def sort_dict(node_levels):
 
     return sorted_by_key
 
+def set_uid_to_dimension(graph):
+    all_uids = nx.topological_sort(graph)
+    print("all_uids\n",all_uids)
+    topo_sorted_uids = list(all_uids)
+    print("topo_sorted_uids\n",topo_sorted_uids)
+    uid_to_dimension = {
+            uid: dimension for dimension, uid in enumerate(topo_sorted_uids)
+        }
+    return uid_to_dimension
 
 def find_hierarchy(paths_dict_data, max_level=None):
     hierarchy = {}
