@@ -149,6 +149,7 @@ mvd.txt
 # outputs
 outputs
 logs
+*.out
 
 # backup
 backup
