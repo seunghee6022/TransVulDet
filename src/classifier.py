@@ -23,7 +23,7 @@ class BertWithHierarchicalClassifier(nn.Module):
 
     def forward(self, input_ids, attention_mask=None, labels=None, token_type_ids=None, position_ids=None, head_mask=None, inputs_embeds=None):
         print("INSIDE BertWithHierarchicalClassifier Forward")
-        print("labels---",labels.shape, labels)
+    
         outputs = self.model(
             input_ids,
             attention_mask=attention_mask,
@@ -38,7 +38,7 @@ class BertWithHierarchicalClassifier(nn.Module):
         print("logits---",logits.shape)
         if labels is not None:
             loss = self.loss(logits, labels)
-            print("labels is not None--- loss:",loss)
+            print("labels is not None---calculated loss:",loss)
             return loss, logits
         else:
             return logits
@@ -125,7 +125,7 @@ class BertWithHierarchicalClassifier(nn.Module):
         # This is L2 regularization term
         l2_penalty = self.classifier.l2_penalty()
         total_loss = torch.mean(sum_per_batch_element * weight_batch) + l2_penalty
-        
+        print("INSIDE BertWithHierarchicalClassifier ---- INSIDE loss function------total_loss--------",total_loss)
         return total_loss
 
 class HierarchicalClassifier(nn.Module):

@@ -4,8 +4,7 @@ import pandas as pd
 import numpy as np
 import os
 import json
-from transformers import BertTokenizer, BertForSequenceClassification
-from transformers import TrainingArguments
+from transformers import BertTokenizer, BertForSequenceClassification, TrainingArguments, DataCollatorWithPadding
 from transformers import AdamW, get_linear_schedule_with_warmup
 from transformers import BertModel, BertConfig
 from transformers.trainer_callback import EarlyStoppingCallback
@@ -18,27 +17,36 @@ from src.trainer import CustomTrainer
 from src.dataset import CodeDataset, split_dataframe
 from src.graph import create_graph_from_json, set_uid_to_dimension
 from src.classifier import BertWithHierarchicalClassifier
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
 
-def accuracy(evalPrediction):
-    print("Inside ACCURACY", evalPrediction)
-    yPred = evalPrediction.predictions
-    yTrue = evalPrediction.label_ids
-    print(yPred)
-    print(yTrue)
-    return {'accuracy':(yPred == yTrue).mean()}
+# def accuracy(evalPrediction):
+#     print("Inside ACCURACY", evalPrediction)
+#     yPred = evalPrediction.predictions
+#     yTrue = evalPrediction.label_ids
+#     print(yPred)
+#     print(yTrue)
+#     return {'accuracy':(yPred == yTrue).mean()}
   
 def compute_metrics(p):
-    # print("Inside comepute funtion: self.p:",self.p)
     print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
     predictions, labels = p.predictions, p.label_ids
-    print(f"prediction:{type(predictions)}\nlabels:{type(labels)}")
-    predictions = np.argmax(predictions, axis=1)
-    acc = accuracy_score(labels, predictions)
-    f1 = f1_score(labels, predictions, average='weighted')
+    print(f"prediction:{predictions.shape} {type(predictions)}\nlabels:{labels.shape}{type(labels)}")
+    print(f"prediction:{predictions}\nlabels:{labels}")
+    preds = predictions.argmax(-1)
+    print(f"prediction:{preds.shape} {type(preds)}\nlabels:{labels.shape}{type(labels)}")
+    # labels = np.argmax(labels, axis=-1)
+    print(f"prediction:{preds}\nlabels:{labels}")
+
+    precision, recall, f1, _ = precision_recall_fscore_support(labels, preds, average='weighted')
+    acc = accuracy_score(labels, preds)
+    return {
+        'accuracy': acc,
+        'f1': f1,
+        'precision': precision,
+        'recall': recall
+    }
         
-    return {"accuracy": acc, "f1_score": f1}
 
 if __name__ == "__main__":
     print(os.getcwd())
@@ -73,7 +81,7 @@ if __name__ == "__main__":
         model = BertWithHierarchicalClassifier(model_name, embedding_dim, uid_to_dimension,graph)
 
     tokenizer = BertTokenizer.from_pretrained(model_name)
-    print(f"use_hierarchical_classifier:{use_hierarchical_classifier} --> model:{model}")
+    print(f"use_hierarchical_classifier:{use_hierarchical_classifier} --> \nmodel:{model}")
 
     # Move your model to the selected device
     model.to(device)
@@ -107,14 +115,23 @@ if __name__ == "__main__":
     train_labels = list(train_df["cwe_id"])
     val_labels = list(val_df["cwe_id"])
     test_labels = list(test_df["cwe_id"])
-
-    print(test_labels)
-
+    
     print("uid_to_dimension\n",uid_to_dimension)
 
     train_dataset = CodeDataset(train_encodings, train_labels, uid_to_dimension)
     val_dataset = CodeDataset(val_encodings, val_labels, uid_to_dimension)
     test_dataset = CodeDataset(test_encodings, test_labels, uid_to_dimension)
+
+    # print("test_encodings",test_encodings)
+    # print("test_labels",test_labels, type(test_dataset.labels))
+    # print(test_dataset.labels.shape)
+    # outputs = model(
+    #         test_encodings.input_ids,
+    #         attention_mask=test_encodings.attention_mask,
+    #         token_type_ids=test_encodings.token_type_ids,
+    #         labels=test_dataset.labels,
+    #         )
+    # print(f"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^outputs:{outputs.shape}")
 
     print(len(train_labels),len(val_labels), len(test_labels) )
    
@@ -123,9 +140,11 @@ if __name__ == "__main__":
     # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=num_train_steps)
 
     callbacks = [EarlyStoppingCallback(2,0.8)]
+    data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
     training_args = TrainingArguments(
         per_device_train_batch_size=batch_size,
+        per_device_eval_batch_size=2,
         num_train_epochs=num_epoch,
         weight_decay=0.01,
         logging_dir='./logs',
@@ -145,15 +164,20 @@ if __name__ == "__main__":
         use_hierarchical_classifier = use_hierarchical_classifier,
         model=model,
         args=training_args,
-        tokenizer=tokenizer,
+        data_collator=data_collator,
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
         callbacks=callbacks,
-        compute_metrics=compute_metrics, 
-        # lr_scheduler=scheduler,  # Our custom loss function
+        compute_metrics=compute_metrics,
+        # lr_scheduler=scheduler, 
     )
 
-    trainer.train()
+    # trainer.print_model()
+    # predictions = trainer.predict(test_dataset)
+    # print("MAIN predictions",predictions)
+   
+    # trainer.compute_metrics(predictions)
+    # trainer.train()
     
     # Define the directory for saving figures
     figure_dir = os.path.join('figures', f'lr{lr}_bs{batch_size}_epoch{num_epoch}_{dataset_name}')
