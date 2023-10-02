@@ -5,24 +5,87 @@ import numpy as np
 import os
 import json
 from transformers import BertTokenizer, BertForSequenceClassification
-from transformers import TrainingArguments
+from transformers import TrainingArguments, Trainer
+from torch.nn import BCEWithLogitsLoss
 from transformers import AdamW, get_linear_schedule_with_warmup
 from transformers import BertModel, BertConfig
 
 import networkx as nx
+from torch.utils.data import Dataset, DataLoader
+from sklearn.model_selection import train_test_split
+def create_graph_from_json(paths_dict_data, max_depth=None):
+    
+    G = nx.DiGraph()
 
-from src.trainer import CustomTrainer
-from src.dataset import CodeDataset, split_dataframe
-from src.graph import create_graph_from_json
+    def add_path_to_graph(path):
+        nodes = list(map(int, path.split('-')))
+        if max_depth:
+            max_level = min(max_depth, len(nodes) - 1)
+            for i in range(max_level):
+                G.add_edge(nodes[i], nodes[i+1])
+        else:
+            for i in range(len(nodes) - 1):
+                G.add_edge(nodes[i], nodes[i+1])
+
+    # Add edges from the paths in the JSON data
+    for key, paths_list in paths_dict_data.items():
+        for path in paths_list:
+            add_path_to_graph(path)
+            
+    return G
+
+class CodeDataset(Dataset):
+    def __init__(self, encodings, labels, uid_to_dimension):
+        self.encodings = encodings
+        self.labels = labels
+        self.uid_to_dimension = uid_to_dimension
+        self.num_classes = len(uid_to_dimension)
+        self.one_hot_labels = self.one_hot_encode(labels)
+
+    def one_hot_encode(self, labels):
+        one_hot_encoded = []
+        one_hot = [0] * self.num_classes
+        for label in labels:
+            if label in self.uid_to_dimension:
+                one_hot[self.uid_to_dimension[label]] = 1
+            else:
+                print(f"Warning: Label {type(label)}{label} not found in uid_to_dimension!")
+                if ', CWE' in label:
+                    continue
+                else:
+                    label = int(label)
+            
+            one_hot[self.uid_to_dimension[label]] = 1
+            one_hot_encoded.append(one_hot)
+        return one_hot_encoded
+
+    def __getitem__(self, idx):
+        item = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
+        item["labels"] = torch.tensor(self.one_hot_labels[idx])
+        return item
+
+    def __len__(self):
+        return len(self.labels)
+
 
     
+def SplitDataFrame(df_path, test_size=0.3,random_state=42):
+    df = pd.read_csv(df_path)
+    # Split data into train and temp (which will be further split into val and test)
+    train_df, temp_df = train_test_split(df, test_size=0.2, random_state=42)
+
+    # Split temp_df into validation and test datasets
+    val_df, test_df = train_test_split(temp_df, test_size=0.5, random_state=42)
+
+    return train_df, val_df, test_df
+
 class BertWithHierarchicalClassifier(nn.Module):
     def __init__(self, config: BertConfig, input_dim, embedding_dim, graph):
         super(BertWithHierarchicalClassifier, self).__init__()
         self.model = BertModel(config)
         
         # Here, replace BERT's linear classifier with your hierarchical classifier
-        self.classifier = HirarchicalClassifier(input_dim, embedding_dim, graph)
+        self.classifier = HirarchicalClassification(input_dim, embedding_dim, graph)
         
     def forward(self, input_ids, attention_mask=None, token_type_ids=None, position_ids=None, head_mask=None, inputs_embeds=None):
         outputs = self.model(
@@ -40,9 +103,9 @@ class BertWithHierarchicalClassifier(nn.Module):
         
         return logits
 
-class HirarchicalClassifier(nn.Module):
+class HirarchicalClassification(nn.Module):
     def __init__(self, input_dim, embedding_dim, graph):
-        super(HirarchicalClassifier, self).__init__()
+        super(HirarchicalClassification, self).__init__()
         self.linear = nn.Linear(input_dim, embedding_dim)
         self.graph = graph
         self._force_prediction_targets = True
@@ -145,7 +208,25 @@ class HirarchicalClassifier(nn.Module):
         total_loss = torch.mean(sum_per_batch_element * weight_batch) + l2_penalty
         print("total_loss", total_loss) 
         return total_loss
-    
+class CustomTrainer(Trainer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.loss_fn = BCEWithLogitsLoss()  
+
+    # For multilabel classification, need to define the Custom Loss Function
+    def compute_loss(self, model, inputs, return_outputs=False):
+        print(inputs['labels'].shape)
+        batch_size, num_labels = inputs['labels'].shape
+        print(batch_size, num_labels)
+        # Only reshape if the number of labels doesn't match the model's config
+        if num_labels != model.config.num_labels:
+            print("num_labels != model.config.num_labels")
+
+        logits = model(inputs['input_ids'], attention_mask=inputs['attention_mask'])[0]
+        
+        loss = self.loss_fn(logits.view(-1, model.config.num_labels), 
+                        inputs['labels'].float().view(-1, model.config.num_labels))
+        return (loss, logits) if return_outputs else loss
     
 if __name__ == "__main__":
     print(os.getcwd())
@@ -183,7 +264,7 @@ if __name__ == "__main__":
     max_length = 256
     lr= 2e-5
 
-    train_df, val_df, test_df = split_dataframe(df_path)
+    train_df, val_df, test_df = SplitDataFrame(df_path)
     
     train_encodings = tokenizer(list(train_df["code"]), truncation=True, padding=True, max_length=max_length, return_tensors="pt")
     val_encodings = tokenizer(list(val_df["code"]), truncation=True, padding=True, max_length=max_length, return_tensors="pt")
@@ -205,6 +286,7 @@ if __name__ == "__main__":
     print(len(train_labels),len(val_labels), len(test_labels) )
     
     # Define loss function, optimizer and scheduler
+    criterion = BCEWithLogitsLoss()
     optimizer = AdamW(model.parameters(), lr=lr)
     # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=num_train_steps)
 
