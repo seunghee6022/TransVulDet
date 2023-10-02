@@ -134,8 +134,6 @@ data_preprocessing/CVEfixes
 data_preprocessing/MVD
 temp
 datasets
-label2CWE.txt
-mvd.txt
 *.csv
 
 # shell script
@@ -153,5 +151,3 @@ backup
 text.txt
 plots
 output
-./codeT5.py
-CFD_dataset_preprocessing.ipynb
