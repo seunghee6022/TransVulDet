@@ -33,13 +33,10 @@ def compute_metrics(p):
     predictions, labels = p.predictions, p.label_ids
     print(f"prediction:{predictions.shape} {type(predictions)}\nlabels:{labels.shape}{type(labels)}")
     print(f"prediction:{predictions}\nlabels:{labels}")
-    preds = predictions.argmax(-1)
-    print(f"prediction:{preds.shape} {type(preds)}\nlabels:{labels.shape}{type(labels)}")
     # labels = np.argmax(labels, axis=-1)
-    print(f"prediction:{preds}\nlabels:{labels}")
 
-    precision, recall, f1, _ = precision_recall_fscore_support(labels, preds, average='weighted')
-    acc = accuracy_score(labels, preds)
+    precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted')
+    acc = accuracy_score(labels, predictions)
     return {
         'accuracy': acc,
         'f1': f1,
