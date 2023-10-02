@@ -10,8 +10,6 @@ from transformers import AdamW, get_linear_schedule_with_warmup
 from transformers import BertModel, BertConfig
 
 import networkx as nx
-from torch.utils.data import Dataset
-
 
 from src.trainer import CustomTrainer
 from src.dataset import CodeDataset, split_dataframe
@@ -24,7 +22,7 @@ class BertWithHierarchicalClassifier(nn.Module):
         self.model = BertModel(config)
         
         # Here, replace BERT's linear classifier with your hierarchical classifier
-        self.classifier = HirarchicalClassification(input_dim, embedding_dim, graph)
+        self.classifier = HirarchicalClassifier(input_dim, embedding_dim, graph)
         
     def forward(self, input_ids, attention_mask=None, token_type_ids=None, position_ids=None, head_mask=None, inputs_embeds=None):
         outputs = self.model(
@@ -42,9 +40,9 @@ class BertWithHierarchicalClassifier(nn.Module):
         
         return logits
 
-class HirarchicalClassification(nn.Module):
+class HirarchicalClassifier(nn.Module):
     def __init__(self, input_dim, embedding_dim, graph):
-        super(HirarchicalClassification, self).__init__()
+        super(HirarchicalClassifier, self).__init__()
         self.linear = nn.Linear(input_dim, embedding_dim)
         self.graph = graph
         self._force_prediction_targets = True
