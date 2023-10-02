@@ -128,32 +128,33 @@ class OversampledDatasetGenerator(IterableDataset):
 class CodeDataset(Dataset):
     def __init__(self, encodings, labels, uid_to_dimension):
         self.encodings = encodings
-        self.labels = labels
+        self.cwe_labels = labels
         self.uid_to_dimension = uid_to_dimension
         self.num_classes = len(uid_to_dimension)
-        self.one_hot_labels = self.one_hot_encode(labels)
+        self.labels = self.one_hot_encode(self.cwe_labels)
 
     def one_hot_encode(self, labels):
         one_hot_encoded = []
-        one_hot = [0] * self.num_classes
         for label in labels:
+            one_hot = [0] * self.num_classes
             if label in self.uid_to_dimension:
                 one_hot[self.uid_to_dimension[label]] = 1
             else:
                 print(f"Warning: Label {type(label)}{label} not found in uid_to_dimension!")
                 if ', CWE' in label:
+                    print("Wrong label", label)
                     continue
                 else:
+                    print("String label:",label)
                     label = int(label)
             
-            one_hot[self.uid_to_dimension[label]] = 1
             one_hot_encoded.append(one_hot)
-        return one_hot_encoded
+        return torch.tensor(one_hot_encoded)
 
     def __getitem__(self, idx):
         item = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
-        item["labels"] = torch.tensor(self.one_hot_labels[idx])
+        item["labels"] = torch.tensor(self.labels[idx])
         return item
 
     def __len__(self):
-        return len(self.labels)
+        return len(self.cwe_labels)
