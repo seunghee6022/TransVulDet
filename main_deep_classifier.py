@@ -47,7 +47,7 @@ def compute_metrics(p):
 
 if __name__ == "__main__":
     print(os.getcwd())
-    # # Create graph from JSON
+    # Create graph from JSON
     paths_file = 'data_preprocessing/preprocessed_datasets/debug_datasets/graph_all_paths.json'
     with open(paths_file, 'r') as f:
         paths_dict_data = json.load(f)
@@ -59,7 +59,7 @@ if __name__ == "__main__":
     '''
     # Define Tokenizer and Model
     batch_size = 8
-    num_labels = graph.number_of_nodes()  # or however many labels you have
+    num_labels = graph.number_of_nodes() 
     print("num_labels: ", num_labels)
     use_hierarchical_classifier = True
     model_name = 'bert-base-uncased'
@@ -70,33 +70,28 @@ if __name__ == "__main__":
     # Check if a GPU is available and use it, otherwise, use CPU
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    if not use_hierarchical_classifier:
+    if use_hierarchical_classifier:
+        model = BertWithHierarchicalClassifier(model_name, embedding_dim, uid_to_dimension,graph)
+    else:
         config = BertConfig.from_pretrained(model_name, num_labels=num_labels)
         model = BertForSequenceClassification.from_pretrained(model_name, config=config)
-        
-    else:
-        model = BertWithHierarchicalClassifier(model_name, embedding_dim, uid_to_dimension,graph)
 
     tokenizer = BertTokenizer.from_pretrained(model_name)
     print(f"use_hierarchical_classifier:{use_hierarchical_classifier} --> \nmodel:{model}")
 
-    # Move your model to the selected device
-    model.to(device)
-
     # Freeze all parameters of the model
-    # By setting the requires_grad attribute to False, you can freeze the parameters so they won't be updated during training
     for param in model.parameters():
         param.requires_grad = False
 
-    # Unfreeze the classifier head:
-    # To fine-tune only the classifier head, we'll unfreeze its parameters
+    # Unfreeze the classifier head: to fine-tune only the classifier head
     print(model.classifier)
     for param in model.classifier.parameters():
         print(param)
         param.requires_grad = True
 
+    model.to(device)
+
     # Define Dataset
-    # Split the DataFrame dataset into tran/val/test datasets and Tokenize the "code" column of your DataFrame
     dataset_name = 'MVD_100'
     df_path = f'data_preprocessing/preprocessed_datasets/debug_datasets/{dataset_name}.csv'
     max_length = 256
@@ -174,7 +169,7 @@ if __name__ == "__main__":
     # print("MAIN predictions",predictions)
    
     # trainer.compute_metrics(predictions)
-    # trainer.train()
+    trainer.train()
     
     # Define the directory for saving figures
     figure_dir = os.path.join('figures', f'lr{lr}_bs{batch_size}_epoch{num_epoch}_{dataset_name}')
