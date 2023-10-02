@@ -23,7 +23,6 @@ class BertWithHierarchicalClassifier(nn.Module):
 
     def forward(self, input_ids, attention_mask=None, labels=None, token_type_ids=None, position_ids=None, head_mask=None, inputs_embeds=None):
         print("INSIDE BertWithHierarchicalClassifier Forward")
-    
         outputs = self.model(
             input_ids,
             attention_mask=attention_mask,
@@ -33,7 +32,8 @@ class BertWithHierarchicalClassifier(nn.Module):
             inputs_embeds=inputs_embeds,
         )
         # use the [CLS] token representation as features for hierarchical classifier
-        cls_output = outputs[1]
+        print("outputs", outputs)
+        cls_output = outputs[1] # 1: pooler_output --> shape (batch_size:8, hidden_size:768), 0: hidden_states
         logits = self.classifier(cls_output)
         print("logits---",logits.shape)
         if labels is not None:
@@ -136,8 +136,8 @@ class HierarchicalClassifier(nn.Module):
         self._l2_regularization_coefficient = 5e-5
        
         # Initialize weights and biases to zero
-        nn.init.zeros_(self.linear.weight)
-        nn.init.zeros_(self.linear.bias)
+        nn.init.zeros_(self.linear.weight) # initialize to 0 --> ask..? with not 0?
+        nn.init.zeros_(self.linear.bias) 
         
     def forward(self, x):
         x = self.linear(x)  # Linear transformation
