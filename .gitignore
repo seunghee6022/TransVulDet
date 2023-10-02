@@ -134,7 +134,6 @@ data_preprocessing/CVEfixes
 data_preprocessing/MVD
 temp
 datasets
-*.csv
 
 # shell script
 *.sh
