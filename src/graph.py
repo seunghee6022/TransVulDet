@@ -131,9 +131,7 @@ def sort_dict(node_levels):
 
 def set_uid_to_dimension(graph):
     all_uids = nx.topological_sort(graph)
-    print("all_uids\n",all_uids)
     topo_sorted_uids = list(all_uids)
-    print("topo_sorted_uids\n",topo_sorted_uids)
     uid_to_dimension = {
             uid: dimension for dimension, uid in enumerate(topo_sorted_uids)
         }
@@ -193,39 +191,36 @@ def show_tree_graph(graph):
 
 
 
-if __name__ == "__main__":
-    # Create graph from JSON
-    paths_file = 'graph_all_paths.json'
-    with open(paths_file, 'r') as f:
-        paths_dict_data = json.load(f)
+# if __name__ == "__main__":
+#     # Create graph from JSON
+#     paths_file = 'graph_all_paths.json'
+#     with open(paths_file, 'r') as f:
+#         paths_dict_data = json.load(f)
     
-    mvd_df = pd.read_csv('MVD_6.csv', index_col=0)
-    print(mvd_df)
+#     mvd_df = pd.read_csv('MVD_6.csv', index_col=0)
+#     print(mvd_df)
     
-    labels = list(mvd_df['cwe_id'])
-    print(type(labels), labels)
+#     labels = list(mvd_df['cwe_id'])
+#     print(type(labels), labels)
 
-    max_depth = None
-    G = create_graph_from_json(paths_dict_data, max_depth)
-    # Draw the graph in a tree style
-    # show_tree_graph(G)
+#     max_depth = None
+#     G = create_graph_from_json(paths_dict_data, max_depth)
+#     # Draw the graph in a tree style
+#     # show_tree_graph(G)
 
-    # Example of using the classifier
-    input_dim = 10
-    embedding_dim = 5 #232 num of total nodes (not target nodes)
+#     # Example of using the classifier
+#     input_dim = 10
+#     embedding_dim = 5 #232 num of total nodes (not target nodes)
 
-    uid_to_dimension = set_uid_to_dimension(G)
-    print("uid_to_dimension",len(uid_to_dimension), uid_to_dimension)
+#     uid_to_dimension = set_uid_to_dimension(G)
+#     print("uid_to_dimension",len(uid_to_dimension), uid_to_dimension)
 
-    prediction_target_uids = [int(key) for key in paths_dict_data.keys()]
-    print("prediction_target_uids",len(prediction_target_uids), prediction_target_uids)
+#     prediction_target_uids = [int(key) for key in paths_dict_data.keys()]
+#     print("prediction_target_uids",len(prediction_target_uids), prediction_target_uids)
 
-    embedding = classifier.embed(labels)
-    print("embedding\n",embedding)
-
-    # feature_batch = []
-    # ground_truth = []
-    # loss = classifier.loss(feature_batch, ground_truth)
+#     # feature_batch = []
+#     # ground_truth = []
+#     # loss = classifier.loss(feature_batch, ground_truth)
 
 
     
