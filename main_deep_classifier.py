@@ -11,31 +11,13 @@ from transformers.trainer_callback import EarlyStoppingCallback
 
 import matplotlib.pyplot as plt
 
-import networkx as nx
-
 from src.trainer import CustomTrainer
 from src.dataset import CodeDataset, split_dataframe
 from src.graph import create_graph_from_json, set_uid_to_dimension
 from src.classifier import BertWithHierarchicalClassifier
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
-  
-def compute_metrics(p):
-    print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
-    predictions, labels = p.predictions, p.label_ids
-    print(f"prediction:{predictions.shape} {type(predictions)}\nlabels:{labels.shape}{type(labels)}")
-    print(f"prediction:{predictions}\nlabels:{labels}")
-    # labels = np.argmax(labels, axis=-1)
 
-    precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted')
-    acc = accuracy_score(labels, predictions)
-    return {
-        'accuracy': acc,
-        'f1': f1,
-        'precision': precision,
-        'recall': recall
-    }
-        
 if __name__ == "__main__":
     print(os.getcwd())
     # Create graph from JSON
@@ -43,6 +25,7 @@ if __name__ == "__main__":
     with open(paths_file, 'r') as f:
         paths_dict_data = json.load(f)
    
+    prediction_target_uids = [int(key) for key in paths_dict_data.keys()] # 204
     graph = create_graph_from_json(paths_dict_data, max_depth=None)
 
     '''
@@ -63,7 +46,7 @@ if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     if use_hierarchical_classifier:
-        model = BertWithHierarchicalClassifier(model_name, embedding_dim, uid_to_dimension,graph)
+        model = BertWithHierarchicalClassifier(model_name, embedding_dim, prediction_target_uids, graph)
     else:
         config = BertConfig.from_pretrained(model_name, num_labels=num_labels)
         model = BertForSequenceClassification.from_pretrained(model_name, config=config)
@@ -84,8 +67,9 @@ if __name__ == "__main__":
     model.to(device)
 
     # Define Dataset
-    dataset_name = 'MVD_100'
-    df_path = f'data_preprocessing/preprocessed_datasets/debug_datasets/{dataset_name}.csv'
+    dataset_name = 'MVD_1000'
+    # df_path = f'data_preprocessing/preprocessed_datasets/debug_datasets/{dataset_name}.csv'
+    df_path = f'datasets/{dataset_name}.csv'
     max_length = 256
     lr= 1e-4
     num_epoch = 1
@@ -106,19 +90,28 @@ if __name__ == "__main__":
     val_dataset = CodeDataset(val_encodings, val_labels, uid_to_dimension)
     test_dataset = CodeDataset(test_encodings, test_labels, uid_to_dimension)
 
-    # print("test_encodings",test_encodings)
-    # print("test_labels",test_labels, type(test_dataset.labels))
-    # print(test_dataset.labels.shape)
-    # outputs = model(
-    #         test_encodings.input_ids,
-    #         attention_mask=test_encodings.attention_mask,
-    #         token_type_ids=test_encodings.token_type_ids,
-    #         labels=test_dataset.labels,
-    #         )
-    # print(f"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^outputs:{outputs.shape}")
-
     print(len(train_labels),len(val_labels), len(test_labels) )
-   
+    def compute_metrics(p):
+        print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
+        predictions, labels = p.predictions, p.label_ids
+        # print(f"prediction:{predictions.shape} {type(predictions)}\nlabels:{labels.shape}{type(labels)}")
+        # print(f"prediction:{predictions}\nlabels:{labels}")
+        pred_dist = model.deembed_dist(predictions) # get probabilities of each nodes
+        # print(f"pred_dist: \n{pred_dist}")
+        pred_labels = model.dist_to_labels(pred_dist)
+        predictions = pred_labels
+        print(f"pred_labels:{pred_labels}")
+        labels = np.argmax(labels, axis=-1)
+        print(f"labels: {labels}")
+        precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted')
+        acc = accuracy_score(labels, predictions)
+        return {
+            'accuracy': acc,
+            'f1': f1,
+            'precision': precision,
+            'recall': recall
+        }
+
     # Define loss function, optimizer and scheduler
     optimizer = AdamW(model.parameters(), lr=lr)
     # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=num_train_steps)
@@ -128,7 +121,7 @@ if __name__ == "__main__":
 
     training_args = TrainingArguments(
         per_device_train_batch_size=batch_size,
-        per_device_eval_batch_size=eval_batch_size,
+        per_device_eval_batch_size=batch_size,
         num_train_epochs=num_epoch,
         weight_decay=0.01,
         logging_dir='./logs',
@@ -160,7 +153,7 @@ if __name__ == "__main__":
     # predictions = trainer.predict(test_dataset)
     # print("MAIN predictions",predictions)
    
-    # trainer.train()
+    trainer.train()
     
     # Define the directory for saving figures
     figure_dir = os.path.join('figures', f'lr{lr}_bs{batch_size}_epoch{num_epoch}_{dataset_name}')
