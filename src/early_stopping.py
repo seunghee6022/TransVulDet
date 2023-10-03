@@ -1,22 +1,25 @@
-import torch
+from transformers import TrainerCallback, TrainerControl, TrainingArguments
 
-class EarlyStopping:
-    def __init__(self, patience=3, delta=0):
+class EarlyStoppingCallback(TrainerCallback):
+    def __init__(self, patience=2, threshold=0.8):
         self.patience = patience
-        self.delta = delta
+        self.threshold = threshold
         self.counter = 0
         self.best_score = None
-        self.early_stop = False
-        self.val_loss_min = float('inf')
 
-    def __call__(self, val_loss):
+    def on_epoch_end(self, args: TrainingArguments, state: TrainerControl, **kwargs):
+        # Assuming we're using 'eval_loss' for metric to monitor
+        eval_loss = state.log_history[-1]['eval_loss']
+        score = -eval_loss
+
         if self.best_score is None:
-            self.best_score = val_loss
-        elif val_loss > self.best_score + self.delta:
+            self.best_score = score
+        elif score < self.best_score + self.threshold:
             self.counter += 1
             if self.counter >= self.patience:
-                self.early_stop = True
+                state.should_training_stop = True
         else:
-            self.best_score = val_loss
+            self.best_score = score
             self.counter = 0
-        return self.early_stop
+
+
