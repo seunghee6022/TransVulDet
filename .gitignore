@@ -132,6 +132,7 @@ dmypy.json
 data_preprocessing/dump
 data_preprocessing/CVEfixes
 data_preprocessing/MVD
+data_preprocessing/Bigvul
 temp
 datasets
 
@@ -149,4 +150,3 @@ backup
 # etc
 text.txt
 plots
-output
