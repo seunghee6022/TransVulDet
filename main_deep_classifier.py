@@ -15,7 +15,35 @@ from src.trainer import CustomTrainer
 from src.dataset import CodeDataset, split_dataframe
 from src.graph import create_graph_from_json, set_uid_to_dimension
 from src.classifier import BertWithHierarchicalClassifier
+from src.early_stopping import EarlyStoppingCallback
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+
+def optuna_hp_space(trial):
+    return {
+        "learning_rate": trial.suggest_float("learning_rate", 1e-6, 1e-3, log=True),
+        "per_device_train_batch_size": trial.suggest_categorical("per_device_train_batch_size", [4, 8]),
+        "weight_decay": trial.suggest_float("weight_decay", 1e-3, 1e-1, log=True),
+        "num_train_epochs": trial.suggest_categorical("num_train_epochs", [1])
+    }
+
+def model_init(trial):
+    
+    paths_file = 'data_preprocessing/preprocessed_datasets/debug_datasets/graph_all_paths.json'
+    with open(paths_file, 'r') as f:
+        paths_dict_data = json.load(f)
+   
+    prediction_target_uids = [int(key) for key in paths_dict_data.keys()] # 204
+    graph = create_graph_from_json(paths_dict_data, max_depth=None)
+    num_labels = graph.number_of_nodes()
+    # Setup custom model
+    model = BertWithHierarchicalClassifier(
+        model_name="bert-base-uncased",
+        prediction_target_uids=prediction_target_uids,
+        graph=graph,
+        embedding_dim=num_labels,
+    )
+
+    return model
 
 
 if __name__ == "__main__":
@@ -38,7 +66,7 @@ if __name__ == "__main__":
     print("num_labels: ", num_labels)
     use_hierarchical_classifier = True
     model_name = 'bert-base-uncased'
-    input_dim = 786
+    # input_dim = 768
     embedding_dim = num_labels
     uid_to_dimension = set_uid_to_dimension(graph)
 
@@ -46,7 +74,7 @@ if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     if use_hierarchical_classifier:
-        model = BertWithHierarchicalClassifier(model_name, embedding_dim, prediction_target_uids, graph)
+        model = BertWithHierarchicalClassifier(model_name, prediction_target_uids, graph, embedding_dim)
     else:
         config = BertConfig.from_pretrained(model_name, num_labels=num_labels)
         model = BertForSequenceClassification.from_pretrained(model_name, config=config)
@@ -116,7 +144,7 @@ if __name__ == "__main__":
     optimizer = AdamW(model.parameters(), lr=lr)
     # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=num_train_steps)
 
-    callbacks = [EarlyStoppingCallback(2,0.8)]
+    callbacks = [EarlyStoppingCallback(patience=2, threshold=0.8)]
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
     training_args = TrainingArguments(
@@ -127,7 +155,7 @@ if __name__ == "__main__":
         logging_dir='./logs',
         output_dir='./outputs',
         evaluation_strategy="steps",
-        eval_steps=1,  # Evaluate and log metrics every 500 steps
+        eval_steps=5,  
         logging_steps=1,
         learning_rate=lr,
         remove_unused_columns=False,  # Important for our custom loss function
@@ -139,20 +167,28 @@ if __name__ == "__main__":
 
     trainer = CustomTrainer(
         use_hierarchical_classifier = use_hierarchical_classifier,
-        model=model,
+        model=None,
         args=training_args,
-        data_collator=data_collator,
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
-        callbacks=callbacks,
         compute_metrics=compute_metrics,
-        # lr_scheduler=scheduler, 
+        tokenizer=tokenizer,
+        model_init=model_init,
+        data_collator=data_collator,
+        callbacks=callbacks,
+       
     )
 
-    # trainer.print_model()
-    # predictions = trainer.predict(test_dataset)
-    # print("MAIN predictions",predictions)
-   
+    best_trial = trainer.hyperparameter_search(
+        direction="maximize",
+        backend="optuna",
+        hp_space=optuna_hp_space,
+        n_trials=3,
+        # compute_objective=compute_objective,
+    )
+
+    print(f"best_trial: {best_trial}")
+    '''
     trainer.train()
     
     # Define the directory for saving figures
@@ -204,3 +240,4 @@ if __name__ == "__main__":
     final_val_f1 = val_f1_scores[-1]
     print(f"Final Validation Accuracy: {final_val_acc:.4f}")
     print(f"Final Validation F1 Score: {final_val_f1:.4f}")
+    '''
