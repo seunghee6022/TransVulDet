@@ -5,7 +5,7 @@ from transformers import BertModel, BertConfig
 import networkx as nx
 
 class BertWithHierarchicalClassifier(nn.Module):
-    def __init__(self, model_name, embedding_dim, prediction_target_uids, graph):
+    def __init__(self, model_name, prediction_target_uids, graph, embedding_dim=768):
         super(BertWithHierarchicalClassifier, self).__init__()
         self.model_name = model_name
         self.model = BertModel.from_pretrained(self.model_name)
@@ -24,7 +24,7 @@ class BertWithHierarchicalClassifier(nn.Module):
         self.topo_sorted_uids = None
         self.uid_to_dimension = None
         self.set_uid_to_dimension_and_topo_sorted_uids() # set the uid_to_dimension and topo_sorted_uids
-
+        print(f"self.uid_to_dimension:{self.uid_to_dimension}\nself.topo_sorted_uids:{self.topo_sorted_uids}")
     def set_uid_to_dimension_and_topo_sorted_uids(self):
         all_uids = nx.topological_sort(self.graph)
         self.topo_sorted_uids = list(all_uids)
@@ -202,10 +202,13 @@ class BertWithHierarchicalClassifier(nn.Module):
         return [
             self._deembed_single(embedded_label) for embedded_label in embedded_labels
         ]
+    
     def dist_to_labels(self, pred_dist):
         max_idx_list = []
         for sorted_tuples in pred_dist:
-            max_cwe_id = max(enumerate(sorted_tuples), key=lambda x: x[1][1])[0]
+            max_cwe_id = max(sorted_tuples, key=lambda x: x[1])[0]
+            # print(f"max_cwe_id:{max_cwe_id}")
+            # print(f"self.uid_to_dimension[max_cwe_id]:{self.uid_to_dimension[max_cwe_id]}")
             max_index = self.uid_to_dimension[max_cwe_id]
             max_idx_list.append(max_index)
         return max_idx_list
