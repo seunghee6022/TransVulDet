@@ -70,9 +70,9 @@ if __name__ == "__main__":
     dataset_name = 'MVD_1000'
     # df_path = f'data_preprocessing/preprocessed_datasets/debug_datasets/{dataset_name}.csv'
     df_path = f'datasets/{dataset_name}.csv'
-    max_length = 256
-    lr= 1e-4
-    num_epoch = 1
+    max_length = 512
+    lr= 1e-3
+    num_epoch = 3
 
     train_df, val_df, test_df = split_dataframe(df_path)
     

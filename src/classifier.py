@@ -205,7 +205,8 @@ class BertWithHierarchicalClassifier(nn.Module):
     def dist_to_labels(self, pred_dist):
         max_idx_list = []
         for sorted_tuples in pred_dist:
-            max_index = max(enumerate(sorted_tuples), key=lambda x: x[1][1])[0]
+            max_cwe_id = max(enumerate(sorted_tuples), key=lambda x: x[1][1])[0]
+            max_index = self.uid_to_dimension[max_cwe_id]
             max_idx_list.append(max_index)
         return max_idx_list
 
