@@ -10,6 +10,7 @@ TransVulDet is a Transformer-based Language Model for Vulnerability Detection ai
   * 91 CWE, small
   * https://dl.acm.org/doi/10.1145/3379597.3387501
   * https://github.com/ZeoVan/MSR_20_Code_vulnerability_CSV_Dataset
+    * Downloaded the cleaned version of split functions(CSV format)
 * CVEfixes Dataset
   * 209 CWEs
   * https://zenodo.org/record/7029359
