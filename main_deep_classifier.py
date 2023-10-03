@@ -68,8 +68,8 @@ if __name__ == "__main__":
 
     # Define Dataset
     dataset_name = 'MVD_1000'
-    # df_path = f'data_preprocessing/preprocessed_datasets/debug_datasets/{dataset_name}.csv'
-    df_path = f'datasets/{dataset_name}.csv'
+    df_path = f'data_preprocessing/preprocessed_datasets/debug_datasets/{dataset_name}.csv'
+    # df_path = f'datasets/{dataset_name}.csv'
     max_length = 512
     lr= 1e-3
     num_epoch = 3
