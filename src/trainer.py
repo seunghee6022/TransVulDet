@@ -15,21 +15,19 @@ class CustomTrainer(Trainer):
         print("THIS IS COMPUTE LOSS IN TRAINER")
         # print("inputs['labels']",inputs['labels'].shape)
         batch_size, num_labels = inputs['labels'].shape
-        print("batch_size", batch_size, "num_labels",num_labels)
 
         if self.use_hierarchical_classifier:
-            print("self.use_hierarchical_classifier:",{self.use_hierarchical_classifier})
             # loss, logits = model(inputs['input_ids'], attention_mask=inputs['attention_mask'], labels=inputs['labels'])
             logits = model(inputs['input_ids'], attention_mask=inputs['attention_mask'])
             loss = model.loss(logits, inputs['labels'])
-            print("logits, inputs['labels']", logits.shape,  inputs['labels'].shape)
+            # print("logits, inputs['labels']", logits.shape,  inputs['labels'].shape)
         
         else:
             logits = model(inputs['input_ids'], attention_mask=inputs['attention_mask'])
             loss = self.loss_fn(logits.view(-1, num_labels), inputs['labels'].float().view(-1, num_labels))
-        print("logits shape: ", logits.shape)
-        print("labels shape: ", inputs['labels'].shape)
-        print("loss:", loss)
+        # print("logits shape: ", logits.shape)
+        # print("labels shape: ", inputs['labels'].shape)
+        # print("loss:", loss)
         return (loss, (loss,logits)) if return_outputs else loss
 
     def log_metrics(self, metrics, step=None):
