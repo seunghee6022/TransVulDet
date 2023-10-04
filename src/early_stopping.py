@@ -7,7 +7,7 @@ class EarlyStoppingCallback(TrainerCallback):
         self.counter = 0
         self.best_score = None
 
-    def on_epoch_end(self, args: TrainingArguments, state: TrainerControl, **kwargs):
+    def on_epoch_end(self, args: TrainingArguments, state: TrainerControl, logs=None, **kwargs):
         # Assuming we're using 'eval_loss' for metric to monitor
         eval_loss = state.log_history[-1]['eval_loss']
         score = -eval_loss
