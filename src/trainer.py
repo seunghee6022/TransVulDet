@@ -7,12 +7,12 @@ class CustomTrainer(Trainer):
         self.loss_fn = BCEWithLogitsLoss()
         # self.model = model
         self.use_hierarchical_classifier = use_hierarchical_classifier
-        print("CustomTrainer is Initialized!!!!!!!!!!!")
-        self.print_model()
+        # print("CustomTrainer is Initialized!!!!!!!!!!!")
+        # self.print_model()
 
     # For multilabel classification, need to define the Custom Loss Function
     def compute_loss(self, model, inputs, return_outputs=False):
-        print("THIS IS COMPUTE LOSS IN TRAINER")
+        # print("THIS IS COMPUTE LOSS IN TRAINER")
         # print("inputs['labels']",inputs['labels'].shape)
         batch_size, num_labels = inputs['labels'].shape
 

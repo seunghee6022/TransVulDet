@@ -24,7 +24,7 @@ class BertWithHierarchicalClassifier(nn.Module):
         self.topo_sorted_uids = None
         self.uid_to_dimension = None
         self.set_uid_to_dimension_and_topo_sorted_uids() # set the uid_to_dimension and topo_sorted_uids
-        print(f"self.uid_to_dimension:{self.uid_to_dimension}\nself.topo_sorted_uids:{self.topo_sorted_uids}")
+        # print(f"self.uid_to_dimension:{self.uid_to_dimension}\nself.topo_sorted_uids:{self.topo_sorted_uids}")
     def set_uid_to_dimension_and_topo_sorted_uids(self):
         all_uids = nx.topological_sort(self.graph)
         self.topo_sorted_uids = list(all_uids)
