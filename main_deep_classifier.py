@@ -12,11 +12,11 @@ from transformers.trainer_callback import EarlyStoppingCallback
 import matplotlib.pyplot as plt
 
 from src.trainer import CustomTrainer
-from src.dataset import CodeDataset, split_dataframe
+from src.dataset import CodeDataset, split_dataframe, make_repeat_dataset
 from src.graph import create_graph_from_json, set_uid_to_dimension
 from src.classifier import BertWithHierarchicalClassifier
 from src.early_stopping import EarlyStoppingCallback
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support, balanced_accuracy_score
 import optuna
 
 # Objective function for Optuna
@@ -24,8 +24,11 @@ def objective(trial):
     # Suggest hyperparameters
     lr = trial.suggest_loguniform("learning_rate", 1e-5, 1e-2)
     weight_decay = trial.suggest_loguniform("weight_decay", 1e-7, 1e-2)
-    per_device_train_batch_size = trial.suggest_categorical("per_device_train_batch_size", [4, 8])
-    num_train_epochs =  trial.suggest_categorical("num_train_epochs", [1,3,5])
+    per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
+    # loss function
+
+    # num_train_epochs =  trial.suggest_categorical("num_train_epochs", [1,3,5])
+    num_train_epochs = 10
     max_length = 512
 
     # get the hierarchy graph
@@ -58,26 +61,27 @@ def objective(trial):
         model = BertForSequenceClassification.from_pretrained(model_name, config=config)
 
     tokenizer = BertTokenizer.from_pretrained(model_name)
-    print(f"use_hierarchical_classifier:{use_hierarchical_classifier} --> \nmodel:{model}")
+    # print(f"use_hierarchical_classifier:{use_hierarchical_classifier} --> \nmodel:{model}")
 
     # Freeze all parameters of the model
     for param in model.parameters():
         param.requires_grad = False
 
     # Unfreeze the classifier head: to fine-tune only the classifier head
-    print(model.classifier)
+    # print(model.classifier)
     for param in model.classifier.parameters():
-        print(param)
+        # print(param)
         param.requires_grad = True
 
     model.to(device)
 
     # Define Dataset
-    dataset_name = 'MVD_1000'
+    dataset_name = 'MVD_100'
     df_path = f'data_preprocessing/preprocessed_datasets/debug_datasets/{dataset_name}.csv'
     # df_path = f'datasets/{dataset_name}.csv'
 
-    train_df, val_df, test_df = split_dataframe(df_path)
+    # train_df, val_df, test_df = split_dataframe(df_path)
+    train_df, val_df, test_df = make_repeat_dataset(df_path)
     
     train_encodings = tokenizer(list(train_df["code"]), truncation=True, padding=True, max_length=max_length, return_tensors="pt").to(device)
     val_encodings = tokenizer(list(val_df["code"]), truncation=True, padding=True, max_length=max_length, return_tensors="pt").to(device)
@@ -87,7 +91,7 @@ def objective(trial):
     val_labels = list(val_df["cwe_id"])
     test_labels = list(test_df["cwe_id"])
     
-    print("uid_to_dimension\n",uid_to_dimension)
+    # print("uid_to_dimension\n",uid_to_dimension)
 
     train_dataset = CodeDataset(train_encodings, train_labels, uid_to_dimension)
     val_dataset = CodeDataset(val_encodings, val_labels, uid_to_dimension)
@@ -108,7 +112,9 @@ def objective(trial):
         print(f"labels: {labels}")
         precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted')
         acc = accuracy_score(labels, predictions)
+        balanced_acc = balanced_accuracy_score(labels, predictions)
         return {
+            "balanced_accuracy":balanced_acc,
             'accuracy': acc,
             'f1': f1,
             'precision': precision,
@@ -117,7 +123,7 @@ def objective(trial):
     
     # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=num_train_steps)
 
-    callbacks = [EarlyStoppingCallback(patience=2, threshold=0.8)]
+    callbacks = [EarlyStoppingCallback(patience=5, threshold=0)]
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
     training_args = TrainingArguments(
@@ -128,13 +134,13 @@ def objective(trial):
         logging_dir='./logs',
         output_dir='./outputs',
         evaluation_strategy="steps",
-        eval_steps=5,  
-        logging_steps=1,
+        eval_steps=250,  
+        logging_steps=5,
         learning_rate=lr,
         remove_unused_columns=False,  # Important for our custom loss function
         disable_tqdm=False,
         load_best_model_at_end = True,
-        metric_for_best_model = "accuracy",
+        metric_for_best_model = "balanced_accuracy",
         greater_is_better = True,
     )
 
@@ -156,7 +162,7 @@ def objective(trial):
     print("metrics:",metrics)
 
     # Return the metric we want to optimize (e.g., negative of accuracy for maximization)
-    return -metrics["eval_accuracy"]
+    return metrics["eval_balanced_accuracy"]
 
 
 if __name__ == "__main__":

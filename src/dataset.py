@@ -7,8 +7,22 @@ from imblearn.over_sampling import RandomOverSampler
 from torch.utils.data import Dataset, IterableDataset
 from sklearn.model_selection import train_test_split
 
+def make_repeat_dataset(df_path, test_size=0.3,random_state=42):
+    df = pd.read_csv(df_path)
+    df = df.sample(n=10, random_state=43)
+    print(df)
+    repeated_pp = pd.concat([df] * 100, ignore_index=True)
+    # Split data into train and temp (which will be further split into val and test)
+    train_df, temp_df = train_test_split(repeated_pp, test_size=0.2, random_state=42)
+
+    # Split temp_df into validation and test datasets
+    val_df, test_df = train_test_split(temp_df, test_size=0.5, random_state=42)
+
+    return train_df, val_df, test_df
+
 def split_dataframe(df_path, test_size=0.3,random_state=42):
     df = pd.read_csv(df_path)
+    
     # Split data into train and temp (which will be further split into val and test)
     train_df, temp_df = train_test_split(df, test_size=0.2, random_state=42)
 
