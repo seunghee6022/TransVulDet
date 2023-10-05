@@ -152,7 +152,6 @@ class CodeDataset(Dataset):
         cnt = 0
         one_hot_encoded = []
         for label in labels:
-            print(f"label is ",label)
             one_hot = [0] * self.num_classes
             if label not in self.uid_to_dimension:
                 cnt+=1
@@ -172,7 +171,7 @@ class CodeDataset(Dataset):
             one_hot[self.uid_to_dimension[label]] = 1
  
             one_hot_encoded.append(one_hot)
-        print(f"Total non int label in MVD:P{cnt}")   
+        print(f"Total non int label in MVD:{cnt}")   
         return torch.tensor(one_hot_encoded)
 
     def __getitem__(self, idx):
