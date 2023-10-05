@@ -76,12 +76,12 @@ def objective(trial):
     model.to(device)
 
     # Define Dataset
-    dataset_name = 'MVD_100'
-    df_path = f'data_preprocessing/preprocessed_datasets/debug_datasets/{dataset_name}.csv'
-    # df_path = f'datasets/{dataset_name}.csv'
+    dataset_name = 'MVD'
+    # df_path = f'data_preprocessing/preprocessed_datasets/debug_datasets/{dataset_name}.csv'
+    df_path = f'datasets/{dataset_name}.csv'
 
-    # train_df, val_df, test_df = split_dataframe(df_path)
-    train_df, val_df, test_df = make_repeat_dataset(df_path)
+    train_df, val_df, test_df = split_dataframe(df_path)
+    # train_df, val_df, test_df = make_repeat_dataset(df_path)
     
     train_encodings = tokenizer(list(train_df["code"]), truncation=True, padding=True, max_length=max_length, return_tensors="pt").to(device)
     val_encodings = tokenizer(list(val_df["code"]), truncation=True, padding=True, max_length=max_length, return_tensors="pt").to(device)
@@ -162,7 +162,8 @@ def objective(trial):
     print("metrics:",metrics)
 
     # Return the metric we want to optimize (e.g., negative of accuracy for maximization)
-    return metrics["eval_balanced_accuracy"]
+    # return metrics["eval_balanced_accuracy"]
+    return metrics["eval_loss"]
 
 
 if __name__ == "__main__":
