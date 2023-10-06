@@ -95,7 +95,7 @@ def objective(trial):
     model.to(device)
 
     # Define Dataset
-    dataset_name = 'MVD_1000'
+    dataset_name = 'MVD'
     # df_path = f'data_preprocessing/preprocessed_datasets/debug_datasets/{dataset_name}.csv'
     df_path = f'datasets/{dataset_name}.csv'
 
@@ -197,7 +197,7 @@ if __name__ == "__main__":
     print(os.getcwd())
     # Initialize Optuna study
     study = optuna.create_study(direction="maximize")
-    study.optimize(objective, n_trials=1)
+    study.optimize(objective, n_trials=100)
 
     # Print results
     print(f"Best trial: {study.best_trial.params}")
