@@ -175,7 +175,7 @@ class CodeDataset(Dataset):
         return torch.tensor(one_hot_encoded)
 
     def __getitem__(self, idx):
-        item = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
+        item = {key: torch.tensor(val[idx]).clone().detach() for key, val in self.encodings.items()}
         item["labels"] = torch.tensor(self.labels[idx])
         return item
 
