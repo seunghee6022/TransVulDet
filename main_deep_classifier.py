@@ -95,7 +95,7 @@ def objective(trial):
     model.to(device)
 
     # Define Dataset
-    dataset_name = 'MVD'
+    dataset_name = 'MVD_1000'
     # df_path = f'data_preprocessing/preprocessed_datasets/debug_datasets/{dataset_name}.csv'
     df_path = f'datasets/{dataset_name}.csv'
 
@@ -131,10 +131,11 @@ def objective(trial):
         # print(f"prediction:{predictions}\nlabels:{labels}")
         pred_dist = model.deembed_dist(predictions) # get probabilities of each nodes
         # print(f"pred_dist: \n{pred_dist}")
-        pred_labels = model.dist_to_labels(pred_dist)
+        pred_labels = model.dist_to_cwe_ids(pred_dist)
         predictions = pred_labels
         print(f"pred_labels:{pred_labels}")
-        labels = np.argmax(labels, axis=-1)
+        idx_labels = np.argmax(labels, axis=-1)
+        labels = model.dimension_to_cwe_id(idx_labels)
         print(f"labels: {labels}")
         precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted')
         acc = accuracy_score(labels, predictions)
@@ -199,7 +200,7 @@ if __name__ == "__main__":
 
     # Print results
     print(f"Best trial: {study.best_trial.params}")
-    print(f"Best accuracy: {-study.best_value}")
+    print(f"Best accuracy: {study.best_value}")
 
     '''
     # Create graph from JSON

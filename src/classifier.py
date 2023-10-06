@@ -203,15 +203,26 @@ class BertWithHierarchicalClassifier(nn.Module):
             self._deembed_single(embedded_label) for embedded_label in embedded_labels
         ]
     
-    def dist_to_labels(self, pred_dist):
-        max_idx_list = []
+    def dist_to_cwe_ids(self, pred_dist):
+        max_cwe_id_list = []
         for sorted_tuples in pred_dist:
             max_cwe_id = max(sorted_tuples, key=lambda x: x[1])[0]
             # print(f"max_cwe_id:{max_cwe_id}")
             # print(f"self.uid_to_dimension[max_cwe_id]:{self.uid_to_dimension[max_cwe_id]}")
-            max_index = self.uid_to_dimension[max_cwe_id]
-            max_idx_list.append(max_index)
-        return max_idx_list
+            # max_index = self.uid_to_dimension[max_cwe_id]
+            max_cwe_id_list.append(max_cwe_id)
+        return max_cwe_id_list
+    
+    def dimension_to_cwe_id(self, idx_labels):
+        dimension_to_uid = {v:k for k, v in self.uid_to_dimension.items()}
+        print(dimension_to_uid)
+        cwe_id_list = [dimension_to_uid[idx] for idx in idx_labels]
+        print("idx_labels",idx_labels)
+        print("cwe_id_list",cwe_id_list)
+        return cwe_id_list
+
+
+
 
 
 
