@@ -2,7 +2,16 @@ from transformers import Trainer
 from torch.nn import BCEWithLogitsLoss
 
 class CustomTrainer(Trainer):
-    def __init__(self, use_hierarchical_classifier=False, *args, **kwargs):
+    '''
+    #class_weights --> loss gets weighted by the ground truth class -- inverse probabiity weighting
+    e.g. def __init__(self, use_hierarchical_classifier=False, class_weights, *args, **kwargs): 
+
+    Or find other weight loss and combine with comepute_loss!
+
+    Or BCEWithLogitsLoss + pos_weight arg  --> Binary classification
+    
+    '''
+    def __init__(self, use_hierarchical_classifier=False, *args, **kwargs): 
         super().__init__( *args, **kwargs)
         self.loss_fn = BCEWithLogitsLoss()
         # self.model = model
