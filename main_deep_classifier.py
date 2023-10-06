@@ -18,6 +18,7 @@ from src.classifier import BertWithHierarchicalClassifier
 from src.early_stopping import EarlyStoppingCallback
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, balanced_accuracy_score
 import optuna
+from datasets import Dataset
 
 def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
@@ -33,7 +34,7 @@ def tokenize_in_chunks(data, tokenizer, max_length, chunk_size=1000):
     for chunk in chunks(data, chunk_size):
         encodings = tokenizer(chunk, truncation=True, padding=True, max_length=max_length, return_tensors="pt")
         all_encodings.append(encodings)
-        
+
     # Now combine all encodings into one
     combined_encodings = {key: torch.cat([enc[key] for enc in all_encodings]) for key in all_encodings[0]}
     return combined_encodings
@@ -97,7 +98,7 @@ def objective(trial):
     # Define Dataset
     dataset_name = 'MVD'
     # df_path = f'data_preprocessing/preprocessed_datasets/debug_datasets/{dataset_name}.csv'
-    df_path = f'datasets/{dataset_name}.csv'
+    df_path = f'datasets_/{dataset_name}.csv'
 
     train_df, val_df, test_df = split_dataframe(df_path)
     # train_df, val_df, test_df = make_repeat_dataset(df_path)
