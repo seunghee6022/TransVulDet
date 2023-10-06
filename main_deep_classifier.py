@@ -189,7 +189,8 @@ def objective(trial):
     print("metrics:",metrics)
 
     # Return the metric we want to optimize (e.g., negative of accuracy for maximization)
-    return metrics["eval_balanced_accuracy"]
+    # return metrics["eval_balanced_accuracy"]
+    return metrics["eval_loss"]
 
 
 if __name__ == "__main__":
