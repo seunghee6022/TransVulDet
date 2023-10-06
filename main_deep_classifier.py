@@ -18,25 +18,26 @@ from src.classifier import BertWithHierarchicalClassifier
 from src.early_stopping import EarlyStoppingCallback
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, balanced_accuracy_score
 import optuna
+from datasets import Dataset
 
-def chunks(lst, n):
-    """Yield successive n-sized chunks from lst."""
-    for i in range(0, len(lst), n):
-        yield lst[i:i + n]
+# def chunks(lst, n):
+#     """Yield successive n-sized chunks from lst."""
+#     for i in range(0, len(lst), n):
+#         yield lst[i:i + n]
 
-def move_encodings_to_device(encodings, device):
-    return {key: tensor.to(device) for key, tensor in encodings.items()}
+# def move_encodings_to_device(encodings, device):
+#     return {key: tensor.to(device) for key, tensor in encodings.items()}
 
 
-def tokenize_in_chunks(data, tokenizer, max_length, chunk_size=1000):
-    all_encodings = []
-    for chunk in chunks(data, chunk_size):
-        encodings = tokenizer(chunk, truncation=True, padding=True, max_length=max_length, return_tensors="pt")
-        all_encodings.append(encodings)
-        
-    # Now combine all encodings into one
-    combined_encodings = {key: torch.cat([enc[key] for enc in all_encodings]) for key in all_encodings[0]}
-    return combined_encodings
+# def tokenize_in_chunks(data, tokenizer, max_length, chunk_size=1000):
+#     all_encodings = []
+#     for chunk in chunks(data, chunk_size):
+#         encodings = tokenizer(chunk, truncation=True, padding=True, max_length=max_length, return_tensors="pt")
+#         all_encodings.append(encodings)
+
+#     # Now combine all encodings into one
+#     combined_encodings = {key: torch.cat([enc[key] for enc in all_encodings]) for key in all_encodings[0]}
+#     return combined_encodings
 
 # Objective function for Optuna
 def objective(trial):
@@ -97,21 +98,21 @@ def objective(trial):
     # Define Dataset
     dataset_name = 'MVD'
     # df_path = f'data_preprocessing/preprocessed_datasets/debug_datasets/{dataset_name}.csv'
-    df_path = f'datasets/{dataset_name}.csv'
+    df_path = f'datasets_/{dataset_name}.csv'
 
     train_df, val_df, test_df = split_dataframe(df_path)
     # train_df, val_df, test_df = make_repeat_dataset(df_path)
     
-    # train_encodings = tokenizer(list(train_df["code"]), truncation=True, padding=True, max_length=max_length, return_tensors="pt").to(device)
-    # val_encodings = tokenizer(list(val_df["code"]), truncation=True, padding=True, max_length=max_length, return_tensors="pt").to(device)
-    # test_encodings = tokenizer(list(test_df["code"]), truncation=True, padding=True, max_length=max_length, return_tensors="pt").to(device)
-    train_encodings = tokenize_in_chunks(list(train_df["code"]), tokenizer, max_length=max_length)
-    val_encodings = tokenize_in_chunks(list(val_df["code"]), tokenizer, max_length=max_length)
-    test_encodings = tokenize_in_chunks(list(test_df["code"]), tokenizer, max_length=max_length)
+    train_encodings = tokenizer(list(train_df["code"]), truncation=True, padding=True, max_length=max_length, return_tensors="pt").to(device)
+    val_encodings = tokenizer(list(val_df["code"]), truncation=True, padding=True, max_length=max_length, return_tensors="pt").to(device)
+    test_encodings = tokenizer(list(test_df["code"]), truncation=True, padding=True, max_length=max_length, return_tensors="pt").to(device)
+    # train_encodings = tokenize_in_chunks(list(train_df["code"]), tokenizer, max_length=max_length)
+    # val_encodings = tokenize_in_chunks(list(val_df["code"]), tokenizer, max_length=max_length)
+    # test_encodings = tokenize_in_chunks(list(test_df["code"]), tokenizer, max_length=max_length)
 
-    train_encodings =move_encodings_to_device(train_encodings, device)
-    val_encodings =move_encodings_to_device(val_encodings, device)
-    test_encodings =move_encodings_to_device(test_encodings, device)
+    # train_encodings =move_encodings_to_device(train_encodings, device)
+    # val_encodings =move_encodings_to_device(val_encodings, device)
+    # test_encodings =move_encodings_to_device(test_encodings, device)
    
     train_labels = list(train_df["cwe_id"])
     val_labels = list(val_df["cwe_id"])
