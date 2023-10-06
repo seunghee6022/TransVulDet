@@ -137,7 +137,8 @@ class OversampledDatasetGenerator(IterableDataset):
                 resampled_labels = resampled_one_hot_labels
 
             yield resampled_encodings, resampled_labels
-            
+
+  
        
 class CodeDataset(Dataset):
     def __init__(self, encodings, labels, uid_to_dimension):
@@ -148,25 +149,33 @@ class CodeDataset(Dataset):
         self.labels = self.one_hot_encode(self.cwe_labels)
 
     def one_hot_encode(self, labels):
+        cnt = 0
         one_hot_encoded = []
         for label in labels:
             one_hot = [0] * self.num_classes
-            if label in self.uid_to_dimension:
-                one_hot[self.uid_to_dimension[label]] = 1
-            # else:
-            #     print(f"Warning: Label {type(label)}{label} not found in uid_to_dimension!")
-            #     if ', CWE' in label:
-            #         print("Wrong label", label)
-            #         continue
-            #     else:
-            #         print("String label:",label)
-            #         label = int(label)
-            
+            if label not in self.uid_to_dimension:
+                cnt+=1
+                print(f"Warning: Label {type(label)}{label} not found in uid_to_dimension!")
+                if ', CWE' in label:
+                    print("Multi label", label)
+                    continue
+                elif 'CWE-' in label:
+                    print(f"CWE-{label[4:]} label:{label}")
+                    label = int(label[4:])
+                elif 'non-vulnerable' in label:
+                    label = 0
+                else:
+                    print("String label:",label)
+                    label = int(label)
+                label = 0
+            one_hot[self.uid_to_dimension[label]] = 1
+ 
             one_hot_encoded.append(one_hot)
+        print(f"Total non int label in MVD:{cnt}")   
         return torch.tensor(one_hot_encoded)
 
     def __getitem__(self, idx):
-        item = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
+        item = {key: torch.tensor(val[idx]).clone().detach() for key, val in self.encodings.items()}
         item["labels"] = torch.tensor(self.labels[idx])
         return item
 
