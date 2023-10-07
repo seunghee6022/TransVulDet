@@ -86,10 +86,9 @@ class BertWithHierarchicalClassifier(nn.Module):
         '''
         ground_truth should be cwe id values. Given ground_truth is one-hot-encoded so needed to be converted to cwe_id list
         '''
-        print(targets)
         # targets = self.one_hot_labels_to_cweIDs_labels(targets)
         targets = targets.tolist()
-        print(targets)
+    
         # If weight_batch is not provided, use a tensor of ones with the same shape as logits
         if weight_batch is None:
             weight_batch = torch.ones_like(logits[:, 0])
@@ -98,7 +97,6 @@ class BertWithHierarchicalClassifier(nn.Module):
         loss_mask = torch.tensor(loss_mask, dtype=torch.float32)
         
         for i, label in enumerate(targets):
-            print(i, label)
             # Loss mask
             loss_mask[i, self.uid_to_dimension[label]] = 1.0
 
