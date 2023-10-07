@@ -31,13 +31,11 @@ if __name__ == "__main__":
     graph = create_graph_from_json(paths_dict_data, max_depth=None)
 
     # Define Tokenizer and Model
-    batch_size = 8
-    eval_batch_size = 2
+    batch_size = 32
     num_labels = graph.number_of_nodes() 
     print("num_labels: ", num_labels)
     use_hierarchical_classifier = True
     model_name = 'bert-base-uncased'
-    # input_dim = 768
     embedding_dim = num_labels
     uid_to_dimension = set_uid_to_dimension(graph)
     lr= 1e-3
@@ -60,9 +58,7 @@ if __name__ == "__main__":
         param.requires_grad = False
 
     # Unfreeze the classifier head: to fine-tune only the classifier head
-    print(model.classifier)
     for param in model.classifier.parameters():
-        print(param)
         param.requires_grad = True
 
     model.to(device)
@@ -82,8 +78,6 @@ if __name__ == "__main__":
     
     # Function to tokenize on the fly
     def encode(example):
-        print(example.keys())
-        print(type(example['cwe_id']),example['cwe_id'])
         tokenized_inputs = tokenizer(example['code'], truncation=True, padding=True, max_length=max_length,return_tensors="pt").to(device)
         # tokenized_inputs['labels'] = one_hot_encode(example['cwe_id'])
         tokenized_inputs['labels'] = example['cwe_id']
@@ -97,7 +91,6 @@ if __name__ == "__main__":
     'test': f'{df_path}/test_data.csv'
     }
     dataset = load_dataset('csv', data_files=data_files)
-    print(dataset)
     # Set the transform function for on-the-fly tokenization
     dataset = dataset.with_transform(encode)
     print(dataset)
@@ -111,15 +104,15 @@ if __name__ == "__main__":
     def compute_metrics(p):
         print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
         predictions, labels = p.predictions, p.label_ids
-        print(f"prediction:{predictions.shape} {type(predictions)}\nlabels:{labels.shape}{type(labels)}")
+        # print(f"prediction:{predictions.shape} {type(predictions)}\nlabels:{labels.shape}{type(labels)}")
         print(f"prediction:{predictions}\nlabels:{labels}")
         pred_dist = model.deembed_dist(predictions) # get probabilities of each nodes
         # print(f"pred_dist: \n{pred_dist}")
         pred_labels = model.dist_to_cwe_ids(pred_dist)
         predictions = pred_labels
         print(f"pred_labels:{pred_labels}")
-        idx_labels = np.argmax(labels, axis=-1)
-        labels = model.dimension_to_cwe_id(idx_labels)
+        # idx_labels = np.argmax(labels, axis=-1)
+        # labels = model.dimension_to_cwe_id(idx_labels)
         print(f"labels: {labels}")
         precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted')
         acc = accuracy_score(labels, predictions)
@@ -153,7 +146,7 @@ if __name__ == "__main__":
         remove_unused_columns=False,  # Important for our custom loss function
         disable_tqdm=False,
         load_best_model_at_end = True,
-        metric_for_best_model = "balanceds_accuracy",
+        metric_for_best_model = "balanced_accuracy",
         greater_is_better = True,
     )
 
