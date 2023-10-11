@@ -203,7 +203,7 @@ if __name__ == "__main__":
     parser.add_argument('--num-trials', type=int, default=50, help='Number of trials for Optuna')
     parser.add_argument('--use-hierarchical-classifier', type=bool, default=True, help='Flag for hierarchical classification')
     parser.add_argument('--use-full-datasets', type=bool, default=True, help='Flag for using full datasets(combined 3 datasets)')
-    parser.add_argument('--num-train-epoch', type=int, default=5, help='Number of epoch for training')
+    parser.add_argument('--num-train-epochs', type=int, default=5, help='Number of epoch for training')
     parser.add_argument('--max-length', type=int, default=512, help='Maximum length for token number')
 
     # Parse the command line arguments
