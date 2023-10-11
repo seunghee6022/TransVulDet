@@ -15,7 +15,7 @@ from src.trainer import CustomTrainer
 from src.dataset import CodeDataset, split_dataframe, make_repeat_dataset
 from src.graph import create_graph_from_json, set_uid_to_dimension
 from src.classifier import BertWithHierarchicalClassifier
-from src.early_stopping import EarlyStoppingCallback
+from callback import EarlyStoppingCallback
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, balanced_accuracy_score
 import optuna
 from datasets import Dataset
