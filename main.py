@@ -7,7 +7,7 @@ import json
 from transformers import AutoTokenizer, BertTokenizer, BertForSequenceClassification, TrainingArguments, DataCollatorWithPadding
 from transformers import AdamW, get_linear_schedule_with_warmup
 from transformers import BertModel, BertConfig
-from transformers.trainer_callback import EarlyStoppingCallback
+# from transformers.trainer_callback import EarlyStoppingCallback
 
 import matplotlib.pyplot as plt
 
@@ -15,12 +15,13 @@ from src.trainer import CustomTrainer
 from src.dataset import CodeDataset, split_dataframe
 from src.graph import create_graph_from_json, set_uid_to_dimension
 from src.classifier import BertWithHierarchicalClassifier
-from src.early_stopping import EarlyStoppingCallback
+from src.callback import EarlyStoppingCallback, WandbCallback
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, balanced_accuracy_score
 import optuna
 from datasets import load_dataset
 
 import argparse
+import wandb
 
 # Objective function for Optuna
 def objective(trial, args):
@@ -34,7 +35,9 @@ def objective(trial, args):
     max_length = args.max_length
     use_hierarchical_classifier = args.use_hierarchical_classifier
     use_full_datasets = args.use_full_datasets
-
+    print("use_full_datasets",use_full_datasets)
+    use_full_datasets = False
+    print("use_full_datasets",use_full_datasets)
     # Suggest hyperparameters
     lr = trial.suggest_loguniform("learning_rate", 1e-5, 1e-2)
     weight_decay = trial.suggest_loguniform("weight_decay", 1e-7, 1e-2)
@@ -66,6 +69,7 @@ def objective(trial, args):
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print(f"use_hierarchical_classifier:{use_hierarchical_classifier} --> \nmodel:{model}")
+    wandb.watch(model)
 
     # Freeze all parameters of the model
     for param in model.parameters():
@@ -144,10 +148,10 @@ def objective(trial, args):
         }
 
     # Define loss function, optimizer and scheduler
-    optimizer = AdamW(model.parameters(), lr=lr)
+    # optimizer = AdamW(model.parameters(), lr=lr)
     # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=num_train_steps)
 
-    callbacks = [EarlyStoppingCallback(patience=5, threshold=0)]
+
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
     training_args = TrainingArguments(
@@ -178,13 +182,15 @@ def objective(trial, args):
         compute_metrics=compute_metrics,
         tokenizer=tokenizer,
         data_collator=data_collator,
-        callbacks=callbacks,
+        callbacks=[EarlyStoppingCallback(patience=5, threshold=0),WandbCallback],
        
     )
 
     # Train and evaluate the model
     trainer.train()
     metrics = trainer.evaluate()
+    # Log metrics to wandb
+    wandb.log(metrics)
     print("metrics:",metrics)
 
     # Return the metric we want to optimize (e.g., negative of accuracy for maximization)
@@ -193,6 +199,9 @@ def objective(trial, args):
     
 
 if __name__ == "__main__":
+    # Initialize a new run
+    wandb.init(project="TransVulDet", name="HPO_with_small_datasets")
+
     # Create an ArgumentParser object
     parser = argparse.ArgumentParser(description="Hyperparameter optimization using Optuna")
 
@@ -202,12 +211,13 @@ if __name__ == "__main__":
     parser.add_argument('--model-name', type=str, default='bert-base-uncased', help='Name of the model to use')
     parser.add_argument('--num-trials', type=int, default=50, help='Number of trials for Optuna')
     parser.add_argument('--use-hierarchical-classifier', type=bool, default=True, help='Flag for hierarchical classification')
-    parser.add_argument('--use-full-datasets', type=bool, default=True, help='Flag for using full datasets(combined 3 datasets)')
+    parser.add_argument('--use-full-datasets', type=bool, default=False, help='Flag for using full datasets(combined 3 datasets)')
     parser.add_argument('--num-train-epochs', type=int, default=5, help='Number of epoch for training')
     parser.add_argument('--max-length', type=int, default=512, help='Maximum length for token number')
 
     # Parse the command line arguments
     args = parser.parse_args()
+    print("MAIN - args",args)
 
     print(os.getcwd())
 

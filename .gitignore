@@ -152,3 +152,6 @@ backup
 # etc
 text.txt
 plots
+
+# wandb
+wandb

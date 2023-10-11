@@ -1,4 +1,5 @@
 from transformers import TrainerCallback, TrainerState, TrainerControl, TrainingArguments
+import wandb
 
 class EarlyStoppingCallback(TrainerCallback):
     def __init__(self, patience=5, threshold=0):
@@ -23,5 +24,12 @@ class EarlyStoppingCallback(TrainerCallback):
         else:
             self.best_score = score
             self.counter = 0
+
+
+class WandbCallback(TrainerCallback):
+    def on_log(self, args: TrainingArguments, state: TrainerState, control:TrainerControl, logs=None, **kwargs):
+        if logs:
+            if "train_loss" in logs:
+                wandb.log({"train_loss": logs["loss"], "learning_rate":logs["learning_rate"], "epoch":logs["epoch"]})
 
 
