@@ -212,12 +212,12 @@ if __name__ == "__main__":
     print(os.getcwd())
 
     # Access command line arguments using args.<argument_name>
-    num_trials = args.num_trials
+    n_trials = args.num_trials
 
     print(os.getcwd())
     # Initialize Optuna study
     study = optuna.create_study(direction="minimize")
-    study.optimize(lambda trial: objective(trial, args), n_trials=args.n_trials)
+    study.optimize(lambda trial: objective(trial, args), n_trials=n_trials)
     
     # Print results
     print(f"Best trial: {study.best_trial.params}")
