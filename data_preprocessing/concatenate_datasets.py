@@ -5,7 +5,7 @@ import os
 # import pickle
 
 
-
+'''
 # Assuming you have three datasets named 'dataset_A.csv', 'dataset_B.csv', and 'dataset_C.csv'
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -121,55 +121,16 @@ data_path = './datasets_'
 MSR_df = pd.read_csv(f'{data_path}/MSR.csv')
 MVD_df = pd.read_csv(f'{data_path}/MVD.csv')
 
-# CVEfixes_df_chunk = pd.read_csv(f'{data_path}/CVEfixes.csv', chunksize=1000)
-# print("CVEfixes_df_chunk is ready")
-
-# def read_csv_chunk(chunks):
-#     df_temp = []
-#     for chunk in CVEfixes_df_chunk:
-#         df_temp.append(chunk)
-#     df = pd.concat(df_temp,ignore_index = True)
-#     return df
-
-# CVEfixes_df = read_csv_chunk(CVEfixes_df_chunk)
-# print("CVEfixes_df is done")
-# # List of non-existing CWE IDs
-# non_exist_cwe_id_list = [16, 17, 18, 19, 21, 189, 199, 254, 255, 264, 275, 310, 320, 361, 388, 399, 534, 769, 840, 1187]
-# print("# CVEfixes_df:",CVEfixes_df.shape)
-# CVEfixes_df = CVEfixes_df[~CVEfixes_df['cwe_id'].isin(non_exist_cwe_id_list)]
-# print("CVEfixes_df - non_exist_cwe_id_list is done",CVEfixes_df.shape)
-
 MSR_df = MSR_df[['code','cwe_id','vul']]
 MVD_df = MVD_df[['code','cwe_id','vul']]
-# CVEfixes_df = CVEfixes_df[['code','cwe_id','vul']]
-# CVEfixes_df['vul'] = CVEfixes_df['vul'].astype(int)
-# CVEfixes_df['cwe_id'] = CVEfixes_df['cwe_id'].astype(int)
-
-# # check if there is nan in vul
-# CVEfixes_df = CVEfixes_df[CVEfixes_df['vul'].notna()]
-# CVEfixes_df['vul'] = CVEfixes_df['vul'].astype(int)
-# print("# CVEfixes_df:",CVEfixes_df.shape)
-
-# # check if there is nan in vul
-# CVEfixes_df = CVEfixes_df[CVEfixes_df['cwe_id'].notna()]
-# CVEfixes_df['cwe_id'] = CVEfixes_df['cwe_id'].astype(int)
-# print("# CVEfixes_df:",CVEfixes_df.shape)
 
 print(MSR_df.head(3))
 print(MVD_df.head(3))
-# print(CVEfixes_df.head(3))
-
-#Add dataset_name column to each dataframe
-# MSR_df['dataset_name'] = 'MSR'
-# MVD_df['dataset_name'] = 'MVD'
-# CVEfixes_df['dataset_name'] = 'CVEfixes'
 
 print("MSR_df columns\n",MSR_df.columns)
 print("MVD_df columns\n",MVD_df.columns)
-# print("CVEfixes_df columns\n",CVEfixes_df.columns)
 
 # Concatenate the datasets
-# concatenated_df = pd.concat([MSR_df, MVD_df, CVEfixes_df])
 concatenated_df = pd.concat([MSR_df, MVD_df])
 print(f"concatenated_df: {concatenated_df.shape}\n{concatenated_df.head(3)}")
 
@@ -223,4 +184,3 @@ print("test_df",test_df.head(3))
 train_df.to_csv(f'{data_path}/train_data.csv', index=False)
 val_df.to_csv(f'{data_path}/val_data.csv', index=False)
 test_df.to_csv(f'{data_path}/test_data.csv', index=False)
-'''
