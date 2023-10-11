@@ -20,35 +20,38 @@ from sklearn.metrics import accuracy_score, precision_recall_fscore_support, bal
 import optuna
 from datasets import load_dataset
 
+import argparse
+
 # Objective function for Optuna
-def objective(trial):
+def objective(trial, args):
+    
+    # Access command line arguments using args.<argument_name>
+    print("args:",args)
+    data_dir = args.data_dir
+    node_paths_dir = args.node_paths_dir
+    model_name = args.model_name
+    num_train_epochs = args.num_train_epochs
+    max_length = args.max_length
+    use_hierarchical_classifier = args.use_hierarchical_classifier
+    use_full_datasets = args.use_full_datasets
+
     # Suggest hyperparameters
     lr = trial.suggest_loguniform("learning_rate", 1e-5, 1e-2)
     weight_decay = trial.suggest_loguniform("weight_decay", 1e-7, 1e-2)
     per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
+    # per_device_train_batch_size = 32
     loss_weight_method = trial.suggest_categorical('loss_weight_method', ['default', 'eqaulize', 'descendants'])
-    # loss_weight_method = 'eqaulize'
     
-    # loss function
-
-    # num_train_epochs =  trial.suggest_categorical("num_train_epochs", [1,3,5])
-    num_train_epochs = 5
-    max_length = 512
-
-     # Create graph from JSON
-    paths_file = 'data_preprocessing/preprocessed_datasets/debug_datasets/graph_all_paths.json'
-    with open(paths_file, 'r') as f:
+    # Create graph from JSON
+    with open(node_paths_dir, 'r') as f:
         paths_dict_data = json.load(f)
    
     prediction_target_uids = [int(key) for key in paths_dict_data.keys()] # 204
     graph = create_graph_from_json(paths_dict_data, max_depth=None)
 
     # Define Tokenizer and Model
-   
     num_labels = graph.number_of_nodes() 
     print("num_labels: ", num_labels)
-    use_hierarchical_classifier = True
-    model_name = 'bert-base-uncased'
     embedding_dim = num_labels
     uid_to_dimension = set_uid_to_dimension(graph)
    
@@ -93,12 +96,18 @@ def objective(trial):
         return tokenized_inputs
 
     # Load dataset and make huggingface datasts
-    df_path = 'datasets_'
-    data_files = {
-    'train': f'{df_path}/train.csv',
-    'validation': f'{df_path}/val.csv',
-    'test': f'{df_path}/test.csv'
-    }
+    if use_full_datasets:
+        data_files = {
+        'train': f'{data_dir}/train.csv',
+        'validation': f'{data_dir}/val.csv',
+        'test': f'{data_dir}/test.csv'
+        }
+    else: 
+        data_files = {
+        'train': f'{data_dir}/train_data.csv',
+        'validation': f'{data_dir}/val_data.csv',
+        'test': f'{data_dir}/test_data.csv'
+        }
     dataset = load_dataset('csv', data_files=data_files)
     # Set the transform function for on-the-fly tokenization
     dataset = dataset.with_transform(encode)
@@ -184,11 +193,44 @@ def objective(trial):
     
 
 if __name__ == "__main__":
+    # Create an ArgumentParser object
+    parser = argparse.ArgumentParser(description="Hyperparameter optimization using Optuna")
+
+    # Add arguments
+    parser.add_argument('--data-dir', type=str, default='datasets_', help='Path to the dataset directory')
+    parser.add_argument('--node-paths-dir', type=str, default='data_preprocessing/preprocessed_datasets/debug_datasets/graph_all_paths.json', help='Path to the dataset directory')
+    parser.add_argument('--model-name', type=str, default='bert-base-uncased', help='Name of the model to use')
+    parser.add_argument('--num-trials', type=int, default=50, help='Number of trials for Optuna')
+    parser.add_argument('--use-hierarchical-classifier', type=bool, default=True, help='Flag for hierarchical classification')
+    parser.add_argument('--use-full-datasets', type=bool, default=True, help='Flag for using full datasets(combined 3 datasets)')
+    parser.add_argument('--num-train-epoch', type=int, default=5, help='Number of epoch for training')
+    parser.add_argument('--max-length', type=int, default=512, help='Maximum length for token number')
+    parser.add_argument('--num-trials', type=int, default=50, help='Number of trials for Optuna')
+
+    # Parse the command line arguments
+    args = parser.parse_args()
+
+    print(os.getcwd())
+
+    # Access command line arguments using args.<argument_name>
+    num_trials = args.num_trials
+
     print(os.getcwd())
     # Initialize Optuna study
     study = optuna.create_study(direction="minimize")
-    study.optimize(objective, n_trials=1)
-
+    study.optimize(lambda trial: objective(trial, args), n_trials=args.n_trials)
+    
     # Print results
     print(f"Best trial: {study.best_trial.params}")
     print(f"Best accuracy: {study.best_value}")
+
+
+    # python main.py \
+    # --data-dir "datasets_" \
+    # --node-paths-dir "data_preprocessing/preprocessed_datasets/debug_datasets/graph_all_paths.json" \
+    # --model-name "bert-base-uncased" \
+    # --num-trials 1 \
+    # --use-hierarchical-classifier True \
+    # --use-full-datasets False \
+    # --num-train-epoch 5 \
+    # --max-length 512
