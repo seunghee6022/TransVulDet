@@ -5,6 +5,8 @@ from sqlite3 import Error
 from pathlib import Path
 import os
 
+print("Path.cwd()",Path.cwd())
+print("Path.cwd().parents[0],",Path.cwd().parents[0])
 def create_connection(db_file):
     """
     create a connection to sqlite3 database
@@ -19,15 +21,21 @@ def create_connection(db_file):
     return conn
 
 DATA_PATH = Path.cwd().parents[0]/ 'Data'
-FIGURE_PATH = Path.cwd() / 'figures'
-RESULT_PATH = Path.cwd() / 'results'
+FIGURE_PATH = Path.cwd() / 'CVEfixes/figures'
+RESULT_PATH = Path.cwd() / 'CVEfixes/results'
+
+print("Path.cwd()",Path.cwd())
+print("Path.cwd().parents[0],",Path.cwd().parents[0])
+print("DATA_PATH",DATA_PATH)
 
 Path(DATA_PATH).mkdir(parents=True, exist_ok=True)
 Path(FIGURE_PATH).mkdir(parents=True, exist_ok=True)
 Path(RESULT_PATH).mkdir(parents=True, exist_ok=True)
 
 conn = create_connection(DATA_PATH / "CVEfixes.db")
-
+cursor = conn.cursor()
+cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+print(cursor.fetchall())
 join_query = """
 SELECT cc.cwe_id, mc.code
 FROM file_change f
@@ -61,7 +69,6 @@ print("Number of NaN values in 'cwe_id':", nan_count)
 
 # convert values None/NaN to 'non-vulnerable' in cwe_id column
 df['cwe_id'] = df['cwe_id'].fillna('non-vulnerable')
-
 cwe_id_counts = df['cwe_id'].value_counts()
 
 print("cwe_id counts:")
@@ -69,6 +76,9 @@ print(cwe_id_counts)
 
 # drop rows based on exception_id_list
 exception_id_list = ['NVD-CWE-Other', 'NVD-CWE-noinfo']
+# List of non-existing CWE IDs
+non_exist_cwe_id_list = [16, 17, 18, 19, 21, 189, 199, 254, 255, 264, 275, 310, 320, 361, 388, 399, 534, 769, 840, 1187]
+
 
 # Assuming you have a DataFrame named 'df' and a column named 'cwe_id'
 for exception_id in exception_id_list:
@@ -77,33 +87,44 @@ for exception_id in exception_id_list:
 
 df = df[~df['cwe_id'].isin(exception_id_list)]
 
+# remove 'CWE-' and make onlu integer cwe_id and convert 'non-vulnerable' to cwe_id:0
+df['cwe_id'] = df['cwe_id'].astype(str)
+df = df[~df['cwe_id'].str.contains(',')] # remove multi labels
+df['cwe_id'] = df['cwe_id'].str.replace('CWE-', '')
+df['cwe_id'] = df['cwe_id'].replace('non-vulnerable', 0)
+df['cwe_id'] = df['cwe_id'].astype(int)
+# Remove rows where 'cwe_id' is in non_exist_cwe_id_list
+df = df[~df['cwe_id'].isin(non_exist_cwe_id_list)]
+
 unique_values = df['cwe_id'].unique()
 print(unique_values)
 
-# load dict to map the unique values to integer indices
-with open("data/total_cwe_dict.txt", "rb") as myFile:
-    total_cwe_dict = pickle.load(myFile)
+# # load dict to map the unique values to integer indices
+# with open("data/total_cwe_dict.txt", "rb") as myFile:
+#     total_cwe_dict = pickle.load(myFile)
 
-df['label'] = df['cwe_id'].map(total_cwe_dict)
+# df['label'] = df['cwe_id'].map(total_cwe_dict)
 df['vul'] = df['cwe_id'].apply(lambda x: 0 if x == 'non-vulnerable' else 1)
 
 # Set 'label' and 'vul' data type to int
-df['label'] = df['label'].astype(int)
+# df['label'] = df['label'].astype(int)
 df['vul'] = df['vul'].astype(int)
 
-label_counts = df['label'].value_counts()
+# label_counts = df['label'].value_counts()
 vul_counts = df['vul'].value_counts()
 
-print("Label counts:")
-print(label_counts)
+# print("Label counts:")
+# print(label_counts)
 
 print("\nVul counts:")
 print(vul_counts)
 
+df = df[['code','cwe_id','vul']]
 print("# of total rows: ",df.shape[0])
 print(df.columns)
 print(df.head(5))
 
 # Save to CSV, rows separated by ""
-df.to_csv('data_preprocessing/preprocessed_datasets/CVEfixes_labeled.csv', index=False, lineterminator="")
+df.to_csv('data_preproessing/CVEfixes/CVEfixes_new.csv', index=False, lineterminator="")
+df.to_csv('datasets_/CVEfixes_new.csv', index=False, lineterminator="")
 
