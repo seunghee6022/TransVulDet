@@ -86,9 +86,9 @@ if __name__ == "__main__":
     # Load dataset and make huggingface datasts
     df_path = 'datasets_'
     data_files = {
-    'train': f'{df_path}/train_data.csv',
-    'validation': f'{df_path}/val_data.csv',
-    'test': f'{df_path}/test_data.csv'
+    'train': f'{df_path}/train.csv',
+    'validation': f'{df_path}/val.csv',
+    'test': f'{df_path}/test.csv'
     }
     dataset = load_dataset('csv', data_files=data_files)
     # Set the transform function for on-the-fly tokenization
@@ -165,7 +165,6 @@ if __name__ == "__main__":
        
     )
 
-  
     trainer.train()
     '''
     # Define the directory for saving figures

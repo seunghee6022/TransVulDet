@@ -5,7 +5,7 @@ from transformers import BertModel, BertConfig
 import networkx as nx
 
 class BertWithHierarchicalClassifier(nn.Module):
-    def __init__(self, model_name, prediction_target_uids, graph, embedding_dim=768):
+    def __init__(self, model_name, prediction_target_uids, graph, _weighting='equalize',embedding_dim=768):
         super(BertWithHierarchicalClassifier, self).__init__()
         self.model_name = model_name
         self.model = BertModel.from_pretrained(self.model_name)
@@ -20,18 +20,70 @@ class BertWithHierarchicalClassifier(nn.Module):
 
         self._force_prediction_targets = True
         self.prediction_target_uids = prediction_target_uids
-        self.loss_weights = torch.ones(embedding_dim)
+    
         self.topo_sorted_uids = None
         self.uid_to_dimension = None
         self.set_uid_to_dimension_and_topo_sorted_uids() # set the uid_to_dimension and topo_sorted_uids
         # print(f"self.uid_to_dimension:{self.uid_to_dimension}\nself.topo_sorted_uids:{self.topo_sorted_uids}")
+        self._weighting = _weighting
+        self.loss_weights = np.ones(len(self.uid_to_dimension))
+        self.get_loss_weight()
+    
     def set_uid_to_dimension_and_topo_sorted_uids(self):
         all_uids = nx.topological_sort(self.graph)
         self.topo_sorted_uids = list(all_uids)
         self.uid_to_dimension = {
                 uid: dimension for dimension, uid in enumerate(self.topo_sorted_uids)
             }
+    def get_loss_weight(self):
+         # (1) Calculate "natural" weights by assuming uniform distribution
+        # over observed concepts
+        occurences = {uid: 0 for uid in self.topo_sorted_uids}
+        for uid in self.prediction_target_uids:
+            affected_uids = {uid}
+            affected_uids |= nx.ancestors(self.graph, uid)
+            for affected_uid in list(affected_uids):
+                affected_uids |= set(self.graph.successors(affected_uid))
+
+            for affected_uid in affected_uids:
+                occurences[affected_uid] += 1
+
+        occurrence_vector = np.array([occurences[uid] for uid in self.uid_to_dimension])
+        print(f"{occurrence_vector}:occurrence_vector")
+
+        # (2) Calculate weight vector
+        if self._weighting == "default":
+            self.loss_weights = np.ones(len(self.uid_to_dimension))
         
+        elif self._weighting == "equalize":
+            try:
+                self.loss_weights = (
+                    np.ones(len(self.uid_to_dimension)) / occurrence_vector
+                )
+            except ZeroDivisionError as err:
+                self.log_fatal("Division by zero in equalize loss weighting strategy.")
+                raise err
+
+        elif self._weighting == "descendants":
+            try:
+                # Start with an equal weighting
+                self.loss_weights = (
+                    np.ones(len(self.uid_to_dimension)) / occurrence_vector
+                )
+
+                for i, uid in enumerate(self.uid_to_dimension):
+                    self.loss_weights[i] *= (
+                        len(nx.descendants(self.graph, uid)) + 1.0
+                    )  # Add one for the node itself.
+                
+            except ZeroDivisionError as err:
+                self.log_fatal(
+                    "Division by zero in descendants loss weighting strategy."
+                )
+                raise err
+        self.loss_weights = torch.tensor(self.loss_weights, dtype=torch.float32)
+        print(f"self._weighting == {self._weighting} --> self.loss_weights = {self.loss_weights}")
+
     def forward(self, input_ids, attention_mask=None, labels=None, token_type_ids=None, position_ids=None, head_mask=None, inputs_embeds=None):
         # print("INSIDE BertWithHierarchicalClassifier Forward")
         outputs = self.model(
@@ -81,6 +133,7 @@ class BertWithHierarchicalClassifier(nn.Module):
          # Convert numpy array to torch tensor
         embedding_tensor = torch.tensor(embedding, dtype=torch.float32)
         return embedding_tensor
+    
     
     def loss(self, logits, targets, weight_batch=None, global_step=None):
         '''
@@ -220,7 +273,6 @@ class BertWithHierarchicalClassifier(nn.Module):
         print("idx_labels",idx_labels)
         print("cwe_id_list",cwe_id_list)
         return cwe_id_list
-
 
 class HierarchicalClassifier(nn.Module):
     def __init__(self, input_dim=786, embedding_dim=None, graph=None):
