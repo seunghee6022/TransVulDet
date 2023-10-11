@@ -104,8 +104,8 @@ concatenated_df['vul'] = concatenated_df['vul'].astype(int)
 print(f"concatenated_df: {concatenated_df.shape}\n{concatenated_df.head(3)}")
 
 # Split the data into train, validation, and test sets
-train_df, test_df = train_test_split(concatenated_df, test_size=0.1, random_state=42)
-val_df, test_df = train_test_split(test_df, test_size=0.3, random_state=42)
+train_df, test_df = train_test_split(concatenated_df, test_size=0.01, random_state=42)
+val_df, test_df = train_test_split(test_df, test_size=0.5, random_state=42)
 
 print("test_df",test_df.head(3))
 
