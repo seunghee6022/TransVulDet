@@ -222,11 +222,6 @@ class BertWithHierarchicalClassifier(nn.Module):
         return cwe_id_list
 
 
-
-
-
-
-
 class HierarchicalClassifier(nn.Module):
     def __init__(self, input_dim=786, embedding_dim=None, graph=None):
         super(HierarchicalClassifier, self).__init__()
