@@ -13,7 +13,7 @@ class EarlyStoppingCallback(TrainerCallback):
         print("INSIDE early stopping!!")
         if self.best_score is None:
             self.best_score = score
-            print("self.best_score:",self.best_score)
+            print("self.best_score:",-self.best_score)
         elif score < self.best_score + self.threshold:
             self.counter += 1
             print("self.counter:",self.counter)

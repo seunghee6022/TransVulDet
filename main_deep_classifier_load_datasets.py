@@ -38,7 +38,7 @@ if __name__ == "__main__":
     model_name = 'bert-base-uncased'
     embedding_dim = num_labels
     uid_to_dimension = set_uid_to_dimension(graph)
-    lr= 1e-3
+    lr= 1e-2
     num_epoch = 3
 
     # Check if a GPU is available and use it, otherwise, use CPU
@@ -103,17 +103,18 @@ if __name__ == "__main__":
 
     def compute_metrics(p):
         print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
+        print("p:",p)
         predictions, labels = p.predictions, p.label_ids
         # print(f"prediction:{predictions.shape} {type(predictions)}\nlabels:{labels.shape}{type(labels)}")
-        print(f"prediction:{predictions}\nlabels:{labels}")
+        print(f"prediction:{predictions.shape}\nlabels:{labels}")
         pred_dist = model.deembed_dist(predictions) # get probabilities of each nodes
-        # print(f"pred_dist: \n{pred_dist}")
+        print(f"pred_dist: \n{len(pred_dist)}")
         pred_labels = model.dist_to_cwe_ids(pred_dist)
         predictions = pred_labels
-        print(f"pred_labels:{pred_labels}")
+        print(f"pred_labels:{len(pred_labels)}")
         # idx_labels = np.argmax(labels, axis=-1)
         # labels = model.dimension_to_cwe_id(idx_labels)
-        print(f"labels: {labels}")
+        print(f"labels: {len(labels)}")
         precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted')
         acc = accuracy_score(labels, predictions)
         balanced_acc = balanced_accuracy_score(labels, predictions)
@@ -140,7 +141,7 @@ if __name__ == "__main__":
         logging_dir='./logs',
         output_dir='./outputs',
         evaluation_strategy="steps",
-        eval_steps=250,  
+        eval_steps=200,  
         logging_steps=100,
         learning_rate=lr,
         remove_unused_columns=False,  # Important for our custom loss function
