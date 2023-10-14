@@ -27,7 +27,6 @@ import wandb
 def objective(trial, args):
     
     # Access command line arguments using args.<argument_name>
-    print("args:",args)
     data_dir = args.data_dir
     node_paths_dir = args.node_paths_dir
     model_name = args.model_name
@@ -35,14 +34,12 @@ def objective(trial, args):
     max_length = args.max_length
     use_hierarchical_classifier = args.use_hierarchical_classifier
     use_full_datasets = args.use_full_datasets
-    print("use_full_datasets",use_full_datasets)
-    use_full_datasets = False
-    print("use_full_datasets",use_full_datasets)
+ 
     # Suggest hyperparameters
     lr = trial.suggest_loguniform("learning_rate", 1e-5, 1e-2)
     weight_decay = trial.suggest_loguniform("weight_decay", 1e-7, 1e-2)
-    per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
-    # per_device_train_batch_size = 32
+    # per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
+    per_device_train_batch_size = 32
     loss_weight_method = trial.suggest_categorical('loss_weight_method', ['default', 'eqaulize', 'descendants'])
     
     # Create graph from JSON
@@ -114,7 +111,8 @@ def objective(trial, args):
         }
     dataset = load_dataset('csv', data_files=data_files)
     # Set the transform function for on-the-fly tokenization
-    dataset = dataset.with_transform(encode)
+    # dataset = dataset.with_transform(encode) #set_transform
+    dataset.set_transform(encode)
     print(dataset)
 
     train_dataset = dataset['train']
@@ -151,7 +149,6 @@ def objective(trial, args):
     # optimizer = AdamW(model.parameters(), lr=lr)
     # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=num_train_steps)
 
-
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
     training_args = TrainingArguments(
@@ -162,7 +159,7 @@ def objective(trial, args):
         logging_dir='./logs',
         output_dir='./outputs',
         evaluation_strategy="steps",
-        eval_steps=250,  
+        eval_steps=5000,  
         logging_steps=100,
         learning_rate=lr,
         remove_unused_columns=False,  # Important for our custom loss function
@@ -182,8 +179,7 @@ def objective(trial, args):
         compute_metrics=compute_metrics,
         tokenizer=tokenizer,
         data_collator=data_collator,
-        callbacks=[EarlyStoppingCallback(patience=5, threshold=0),WandbCallback],
-       
+        callbacks=[EarlyStoppingCallback(patience=5, threshold=0),WandbCallback],  
     )
 
     # Train and evaluate the model
@@ -210,8 +206,8 @@ if __name__ == "__main__":
     parser.add_argument('--node-paths-dir', type=str, default='data_preprocessing/preprocessed_datasets/debug_datasets/graph_all_paths.json', help='Path to the dataset directory')
     parser.add_argument('--model-name', type=str, default='bert-base-uncased', help='Name of the model to use')
     parser.add_argument('--num-trials', type=int, default=50, help='Number of trials for Optuna')
-    parser.add_argument('--use-hierarchical-classifier', type=bool, default=True, help='Flag for hierarchical classification')
-    parser.add_argument('--use-full-datasets', type=bool, default=False, help='Flag for using full datasets(combined 3 datasets)')
+    parser.add_argument('--use-hierarchical-classifier', action='store_true', help='Flag for hierarchical classification')
+    parser.add_argument('--use-full-datasets', action='store_true', help='Flag for using full datasets(combined 3 datasets)') #absent --> false
     parser.add_argument('--num-train-epochs', type=int, default=5, help='Number of epoch for training')
     parser.add_argument('--max-length', type=int, default=512, help='Maximum length for token number')
 
@@ -233,13 +229,17 @@ if __name__ == "__main__":
     print(f"Best trial: {study.best_trial.params}")
     print(f"Best accuracy: {study.best_value}")
 
+# python main.py \
+# --model-name "bert-base-uncased" \
+# --num-trials 1 \
+# --use-hierarchical-classifier 
 
-    # python main.py \
-    # --data-dir "datasets_" \
-    # --node-paths-dir "data_preprocessing/preprocessed_datasets/debug_datasets/graph_all_paths.json" \
-    # --model-name "bert-base-uncased" \
-    # --num-trials 1 \
-    # --use-hierarchical-classifier True \
-    # --use-full-datasets False \
-    # --num-train-epoch 5 \
-    # --max-length 512
+# deepspeed main.py \
+# --model-name "bert-base-uncased" \
+# --num-trials 1 \
+# --use-hierarchical-classifier 
+
+#      python -c 'from transformers import AutoModel; \
+# from deepspeed.runtime.zero.stage3 import estimate_zero3_model_states_mem_needs_all_live; \
+# model = AutoModel.from_pretrained("bert-base-uncased"); \
+# estimate_zero3_model_states_mem_needs_all_live(model, num_gpus_per_node=1, num_nodes=1)'
