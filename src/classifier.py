@@ -29,6 +29,9 @@ class BertWithHierarchicalClassifier(nn.Module):
         self.loss_weights = np.ones(len(self.uid_to_dimension))
         self.get_loss_weight()
     
+    def config(self):
+        return self.model.config
+
     def set_uid_to_dimension_and_topo_sorted_uids(self):
         all_uids = nx.topological_sort(self.graph)
         self.topo_sorted_uids = list(all_uids)
@@ -81,32 +84,32 @@ class BertWithHierarchicalClassifier(nn.Module):
                     "Division by zero in descendants loss weighting strategy."
                 )
                 raise err
-        # elif self._weighting == "reachable_leaf_nodes":
-        #     try:
-        #         # Start with an equal weighting
-        #         self.loss_weights = (
-        #             np.ones(len(self.uid_to_dimension)) / occurrence_vector
-        #         )
+        elif self._weighting == "reachable_leaf_nodes":
+            try:
+                # Start with an equal weighting
+                self.loss_weights = (
+                    np.ones(len(self.uid_to_dimension)) / occurrence_vector
+                )
 
-        #         for i, uid in enumerate(self.uid_to_dimension):
-        #             descendants = set(nx.descendants(self.graph, uid)) | {uid}
-        #             reachable_leaf_nodes = descendants.intersection(
-        #                 self.prediction_target_uids
-        #             )
-        #             self.loss_weights[i] *= len(reachable_leaf_nodes)
+                for i, uid in enumerate(self.uid_to_dimension):
+                    descendants = set(nx.descendants(self.graph, uid)) | {uid}
+                    reachable_leaf_nodes = descendants.intersection(
+                        self.prediction_target_uids
+                    )
+                    self.loss_weights[i] *= len(reachable_leaf_nodes)
 
-        #             # Test if any leaf nodes are reachable
-        #             if len(reachable_leaf_nodes) == 0:
-        #                 raise ValueError(
-        #                     f"In this hierarchy, the node {uid} cannot reach "
-        #                     "any leaf nodes!"
-        #                 )
+                    # Test if any leaf nodes are reachable
+                    if len(reachable_leaf_nodes) == 0:
+                        raise ValueError(
+                            f"In this hierarchy, the node {uid} cannot reach "
+                            "any leaf nodes!"
+                        )
 
-        #     except ZeroDivisionError as err:
-        #         self.log_fatal(
-        #             "Division by zero in reachable_leaf_nodes loss weighting strategy."
-        #         )
-        #         raise err
+            except ZeroDivisionError as err:
+                self.log_fatal(
+                    "Division by zero in reachable_leaf_nodes loss weighting strategy."
+                )
+                raise err
         self.loss_weights = torch.tensor(self.loss_weights, dtype=torch.float32)
         print(f"self._weighting == {self._weighting} --> self.loss_weights = {self.loss_weights}")
 
