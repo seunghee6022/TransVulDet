@@ -38,15 +38,9 @@ def objective(trial, args):
     # Suggest hyperparameters
     lr = trial.suggest_loguniform("learning_rate", 1e-5, 1e-2)
     weight_decay = trial.suggest_loguniform("weight_decay", 1e-7, 1e-2)
-<<<<<<< HEAD
-    # per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
-    per_device_train_batch_size = 1
-    loss_weight_method = trial.suggest_categorical('loss_weight_method', ['default', 'eqaulize', 'descendants'])
-=======
     per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
     # per_device_train_batch_size = 16
     loss_weight_method = trial.suggest_categorical('loss_weight_method', ['default', 'eqaulize', 'descendants','reachable_leaf_nodes'])
->>>>>>> 326b8139760cb6c0730daed0dc762062f9e17fe9
     
     # Create graph from JSON
     with open(node_paths_dir, 'r') as f:
