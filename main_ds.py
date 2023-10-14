@@ -38,9 +38,9 @@ def objective(trial, args):
     # Suggest hyperparameters
     lr = trial.suggest_loguniform("learning_rate", 1e-5, 1e-2)
     weight_decay = trial.suggest_loguniform("weight_decay", 1e-7, 1e-2)
-    # per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
-    per_device_train_batch_size = 16
-    loss_weight_method = trial.suggest_categorical('loss_weight_method', ['default', 'eqaulize', 'descendants'])
+    per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
+    # per_device_train_batch_size = 16
+    loss_weight_method = trial.suggest_categorical('loss_weight_method', ['default', 'eqaulize', 'descendants','reachable_leaf_nodes'])
     
     # Create graph from JSON
     with open(node_paths_dir, 'r') as f:
@@ -66,6 +66,9 @@ def objective(trial, args):
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print(f"use_hierarchical_classifier:{use_hierarchical_classifier} --> \nmodel:{model}")
+    print(f"model.parameter:", model.parameters())
+    # print(f"model.model.config:", model.model.config)
+    print(f"model config:", model.config)
     wandb.watch(model)
 
     # Freeze all parameters of the model
@@ -164,7 +167,7 @@ def objective(trial, args):
         learning_rate=lr,
         remove_unused_columns=False,  # Important for our custom loss function
         disable_tqdm=False,
-        deepspeed="src/ds_config_zero2.json", #for single GPU
+        deepspeed="src/ds_config_zero3.json", #for single GPU
         # deepspeed="src/ds_config_zero3.json", # for multiple GPUs
         # load_best_model_at_end = True,
         # metric_for_best_model = "balanced_accuracy",
@@ -194,11 +197,13 @@ def objective(trial, args):
 
     # Return the metric we want to optimize (e.g., negative of accuracy for maximization)
     # return metrics["eval_balanced_accuracy"]
-    return metrics["eval_loss"]
+    return metrics["f1"]
     
 
 if __name__ == "__main__":
     # Initialize a new run
+    # wandb.login --relogin
+    # wandb.login(key="2770d1c9fcde174291814617201740cbf044366d")
     wandb.init(project="TransVulDet", name="Training_with_DeepSpeed")
 
     # Create an ArgumentParser object
@@ -226,7 +231,7 @@ if __name__ == "__main__":
 
     print(os.getcwd())
     # Initialize Optuna study
-    study = optuna.create_study(direction="minimize")
+    study = optuna.create_study(direction="maximize")
     study.optimize(lambda trial: objective(trial, args), n_trials=n_trials)
     
     # Print results
