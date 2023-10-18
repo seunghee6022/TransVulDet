@@ -1,5 +1,7 @@
 from transformers import TrainerCallback, TrainerState, TrainerControl, TrainingArguments
 import wandb
+import numpy as np
+import optuna
 
 class EarlyStoppingCallback(TrainerCallback):
     def __init__(self, patience=5, threshold=0):
@@ -31,5 +33,35 @@ class WandbCallback(TrainerCallback):
         if logs:
             if "train_loss" in logs:
                 wandb.log({"train_loss": logs["loss"], "learning_rate":logs["learning_rate"], "epoch":logs["epoch"]})
+
+class OptunaPruningCallback(TrainerCallback):
+    def __init__(self, trial, max_steps):
+        self.trial = trial
+        self.max_steps = max_steps
+
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        step = state.global_step
+
+        # Stop the training if step > max_steps
+        if step > self.max_steps:
+            print("control.should_training_stop",control.should_training_stop)
+            control.should_training_stop = True
+            return
+        
+        metric_for_best_model = "eval_loss"
+        metrics = state.log_history[-1].get(metric_for_best_model, None)
+        print(f"metric log_history:{metrics}")
+        metrics = np.mean([log[metric_for_best_model] for log in logs.values()]) if logs is not None else None
+        print(f"metric np.mean:{metrics}")
+        
+        # Report intermediate value to optuna
+        if metrics is not None:
+            self.trial.report(metrics, step)
+
+            # Prune trial if need be
+            if self.trial.should_prune():
+                message = "Trial was pruned at iteration {}.".format(step)
+                raise optuna.TrialPruned(message)
+        
 
 
