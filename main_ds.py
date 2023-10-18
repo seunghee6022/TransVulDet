@@ -67,7 +67,7 @@ def objective(trial, args):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print(f"use_hierarchical_classifier:{use_hierarchical_classifier} --> \nmodel:{model}")
     print(f"model.parameter:", model.parameters())
-    # print(f"model.model.config:", model.model.config)
+    print(f"model.model.config:", model.model.config)
     print(f"model config:", model.config)
     wandb.watch(model)
 
