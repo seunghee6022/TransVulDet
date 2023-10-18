@@ -15,7 +15,7 @@ from src.trainer import CustomTrainer
 from src.dataset import CodeDataset, split_dataframe
 from src.graph import create_graph_from_json, set_uid_to_dimension
 from src.classifier import BertWithHierarchicalClassifier
-from src.callback import EarlyStoppingCallback, WandbCallback
+from src.callback import EarlyStoppingCallback, WandbCallback, OptunaPruningCallback
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, balanced_accuracy_score
 import optuna
 from datasets import load_dataset
@@ -38,8 +38,8 @@ def objective(trial, args):
     # Suggest hyperparameters
     lr = trial.suggest_loguniform("learning_rate", 1e-5, 1e-2)
     weight_decay = trial.suggest_loguniform("weight_decay", 1e-7, 1e-2)
-    per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
-    # per_device_train_batch_size = 32
+    # per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
+    per_device_train_batch_size = 2
     loss_weight_method = trial.suggest_categorical('loss_weight_method', ['default', 'eqaulize', 'descendants'])
     
     # Create graph from JSON
@@ -160,13 +160,13 @@ def objective(trial, args):
         output_dir='./outputs',
         evaluation_strategy="steps",
         eval_steps=5000,  
-        logging_steps=100,
+        logging_steps=1000,
         learning_rate=lr,
         remove_unused_columns=False,  # Important for our custom loss function
         disable_tqdm=False,
-        # load_best_model_at_end = True,
-        # metric_for_best_model = "balanced_accuracy",
-        # greater_is_better = True,
+        load_best_model_at_end = True,
+        metric_for_best_model = "f1",
+        greater_is_better = True,
     )
 
     trainer = CustomTrainer(
@@ -179,7 +179,8 @@ def objective(trial, args):
         compute_metrics=compute_metrics,
         tokenizer=tokenizer,
         data_collator=data_collator,
-        callbacks=[EarlyStoppingCallback(patience=5, threshold=0),WandbCallback],  
+        callbacks=[OptunaPruningCallback(trial=trial, max_steps=30000),WandbCallback],  
+        # callbacks=[EarlyStoppingCallback(patience=5, threshold=0),WandbCallback],
     )
 
     # Train and evaluate the model
