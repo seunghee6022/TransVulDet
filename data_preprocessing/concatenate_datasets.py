@@ -8,7 +8,7 @@ data_path = 'datasets_'
 MSR_df = pd.read_csv(f'{data_path}/MSR.csv')
 # MVD_df = pd.read_csv(f'{data_path}/MVD.csv')
 
-CVEfixes_df_chunk = pd.read_csv(f'{data_path}/CVEfixes.csv', chunksize=1000)
+CVEfixes_df_chunk = pd.read_csv('data_preprocessing/CVEfixes/CVEfixes_new.csv', chunksize=1000)
 print("CVEfixes_df_chunk is ready")
 
 def read_csv_chunk(chunks):
