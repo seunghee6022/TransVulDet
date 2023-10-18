@@ -15,9 +15,11 @@ from src.trainer import CustomTrainer
 from src.dataset import CodeDataset, split_dataframe
 from src.graph import create_graph_from_json, set_uid_to_dimension
 from src.classifier import BertWithHierarchicalClassifier
-from src.callback import EarlyStoppingCallback, WandbCallback
+from src.callback import EarlyStoppingCallback, WandbCallback, OptunaPruningCallback
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, balanced_accuracy_score
 import optuna
+from optuna.pruners import MedianPruner
+
 from datasets import load_dataset
 
 import argparse
@@ -30,6 +32,7 @@ def objective(trial, args):
     data_dir = args.data_dir
     node_paths_dir = args.node_paths_dir
     model_name = args.model_name
+    max_steps = args.max_steps
     num_train_epochs = args.num_train_epochs
     max_length = args.max_length
     use_hierarchical_classifier = args.use_hierarchical_classifier
@@ -167,7 +170,7 @@ def objective(trial, args):
         learning_rate=lr,
         remove_unused_columns=False,  # Important for our custom loss function
         disable_tqdm=False,
-        deepspeed="src/ds_config_zero3.json", #for single GPU
+        deepspeed="src/ds_config_zero2.json", #for single GPU
         # deepspeed="src/ds_config_zero3.json", # for multiple GPUs
         # load_best_model_at_end = True,
         # metric_for_best_model = "balanced_accuracy",
@@ -185,7 +188,7 @@ def objective(trial, args):
         compute_metrics=compute_metrics,
         tokenizer=tokenizer,
         data_collator=data_collator,
-        callbacks=[EarlyStoppingCallback(patience=5, threshold=0),WandbCallback],  
+        callbacks=[EarlyStoppingCallback(patience=5, threshold=0),WandbCallback,OptunaPruningCallback(trial, max_steps)],  
     )
 
     # Train and evaluate the model
@@ -194,10 +197,10 @@ def objective(trial, args):
     # Log metrics to wandb
     wandb.log(metrics)
     print("metrics:",metrics)
-
+    optimize_metric = metrics["eval_loss"]
     # Return the metric we want to optimize (e.g., negative of accuracy for maximization)
     # return metrics["eval_balanced_accuracy"]
-    return metrics["f1"]
+    return optimize_metric
     
 
 if __name__ == "__main__":
@@ -215,6 +218,7 @@ if __name__ == "__main__":
     parser.add_argument('--local_rank', type=int, default=0, help='Local rank. This is used for multi-GPU training.')
     parser.add_argument('--model-name', type=str, default='bert-base-uncased', help='Name of the model to use')
     parser.add_argument('--num-trials', type=int, default=50, help='Number of trials for Optuna')
+    parser.add_argument('--max-steps', type=int, default=10000, help='Number of maximum steps for training')
     parser.add_argument('--use-hierarchical-classifier', action='store_true', help='Flag for hierarchical classification')
     parser.add_argument('--use-full-datasets', action='store_true', help='Flag for using full datasets(combined 3 datasets)') #absent --> false
     parser.add_argument('--num-train-epochs', type=int, default=5, help='Number of epoch for training')
@@ -231,7 +235,7 @@ if __name__ == "__main__":
 
     print(os.getcwd())
     # Initialize Optuna study
-    study = optuna.create_study(direction="maximize")
+    study = optuna.create_study(direction="maximize", pruner=MedianPruner())
     study.optimize(lambda trial: objective(trial, args), n_trials=n_trials)
     
     # Print results

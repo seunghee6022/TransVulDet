@@ -15,7 +15,7 @@ from src.trainer import CustomTrainer
 from src.dataset import CodeDataset, split_dataframe
 from src.graph import create_graph_from_json, set_uid_to_dimension
 from src.classifier import BertWithHierarchicalClassifier
-from src.callback import EarlyStoppingCallback, WandbCallback
+from src.callback import EarlyStoppingCallback, WandbCallback, OptunaPruningCallback
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, balanced_accuracy_score
 import optuna
 from datasets import load_dataset
@@ -33,14 +33,14 @@ def objective(trial, args):
     num_train_epochs = args.num_train_epochs
     max_length = args.max_length
     use_hierarchical_classifier = args.use_hierarchical_classifier
-    use_full_datasets = args.use_full_datasets
+    # use_full_datasets = args.use_full_datasets
  
     # Suggest hyperparameters
     lr = trial.suggest_loguniform("learning_rate", 1e-5, 1e-2)
     weight_decay = trial.suggest_loguniform("weight_decay", 1e-7, 1e-2)
     # per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
-    per_device_train_batch_size = 32
-    loss_weight_method = trial.suggest_categorical('loss_weight_method', ['default', 'eqaulize', 'descendants'])
+    per_device_train_batch_size = 1
+    loss_weight_method = trial.suggest_categorical('loss_weight_method', ['default', 'eqaulize', 'descendants','reachable_leaf_nodes'])
     
     # Create graph from JSON
     with open(node_paths_dir, 'r') as f:
@@ -97,18 +97,13 @@ def objective(trial, args):
         return tokenized_inputs
 
     # Load dataset and make huggingface datasts
-    if use_full_datasets:
-        data_files = {
-        'train': f'{data_dir}/train.csv',
-        'validation': f'{data_dir}/val.csv',
-        'test': f'{data_dir}/test.csv'
-        }
-    else: 
-        data_files = {
-        'train': f'{data_dir}/train_data.csv',
-        'validation': f'{data_dir}/val_data.csv',
-        'test': f'{data_dir}/test_data.csv'
-        }
+  
+    data_files = {
+    'train': f'{data_dir}/train_data.csv',
+    'validation': f'{data_dir}/val_data.csv',
+    'test': f'{data_dir}/test_data.csv'
+    }
+    
     dataset = load_dataset('csv', data_files=data_files)
     # Set the transform function for on-the-fly tokenization
     # dataset = dataset.with_transform(encode) #set_transform
@@ -160,13 +155,13 @@ def objective(trial, args):
         output_dir='./outputs',
         evaluation_strategy="steps",
         eval_steps=5000,  
-        logging_steps=100,
+        logging_steps=1000,
         learning_rate=lr,
         remove_unused_columns=False,  # Important for our custom loss function
         disable_tqdm=False,
-        # load_best_model_at_end = True,
-        # metric_for_best_model = "balanced_accuracy",
-        # greater_is_better = True,
+        load_best_model_at_end = True,
+        metric_for_best_model = "f1",
+        greater_is_better = True,
     )
 
     trainer = CustomTrainer(
@@ -179,7 +174,8 @@ def objective(trial, args):
         compute_metrics=compute_metrics,
         tokenizer=tokenizer,
         data_collator=data_collator,
-        callbacks=[EarlyStoppingCallback(patience=5, threshold=0),WandbCallback],  
+        callbacks=[OptunaPruningCallback(trial=trial, max_steps=30000),WandbCallback],  
+        # callbacks=[EarlyStoppingCallback(patience=5, threshold=0),WandbCallback],
     )
 
     # Train and evaluate the model
@@ -191,7 +187,7 @@ def objective(trial, args):
 
     # Return the metric we want to optimize (e.g., negative of accuracy for maximization)
     # return metrics["eval_balanced_accuracy"]
-    return metrics["eval_loss"]
+    return metrics["f1"]
     
 
 if __name__ == "__main__":
@@ -205,9 +201,9 @@ if __name__ == "__main__":
     parser.add_argument('--data-dir', type=str, default='datasets_', help='Path to the dataset directory')
     parser.add_argument('--node-paths-dir', type=str, default='data_preprocessing/preprocessed_datasets/debug_datasets/graph_all_paths.json', help='Path to the dataset directory')
     parser.add_argument('--model-name', type=str, default='bert-base-uncased', help='Name of the model to use')
-    parser.add_argument('--num-trials', type=int, default=50, help='Number of trials for Optuna')
-    parser.add_argument('--use-hierarchical-classifier', action='store_true', help='Flag for hierarchical classification')
-    parser.add_argument('--use-full-datasets', action='store_true', help='Flag for using full datasets(combined 3 datasets)') #absent --> false
+    parser.add_argument('--num-trials', type=int, default=5, help='Number of trials for Optuna')
+    parser.add_argument('--use-hierarchical-classifier', action='store_true', help='Flag for hierarchical classification') #--use-hierarchical-classifier --> true
+    # parser.add_argument('--use-full-datasets', action='store_true', help='Flag for using full datasets(combined 3 datasets)') #absent --> false
     parser.add_argument('--num-train-epochs', type=int, default=5, help='Number of epoch for training')
     parser.add_argument('--max-length', type=int, default=512, help='Maximum length for token number')
 
@@ -222,7 +218,13 @@ if __name__ == "__main__":
 
     print(os.getcwd())
     # Initialize Optuna study
-    study = optuna.create_study(direction="minimize")
+    study = optuna.create_study(
+        direction="maximize",
+        pruner=optuna.pruners.HyperbandPruner(
+        min_resource=1, max_resource="auto", reduction_factor=3
+    ),
+        
+        )
     study.optimize(lambda trial: objective(trial, args), n_trials=n_trials)
     
     # Print results
