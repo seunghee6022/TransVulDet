@@ -30,7 +30,15 @@ class BertWithHierarchicalClassifier(nn.Module):
         self.get_loss_weight()
     
     def config(self):
-        return self.model.config
+        print("config is called!",self.model.config)
+        # print(self.model.config.hidden_size)
+        # if 'hidden_size' not in self.model.config.keys():
+        #     self.model.config['hidden_size'] = self.embedding_dim
+        #     print(self.model.config)
+        config = BertConfig.from_pretrained(self.model_name, num_labels=self.graph.number_of_nodes() )
+        print("config is BertConfig.from_pretrained",config)
+        return config
+    
 
     def set_uid_to_dimension_and_topo_sorted_uids(self):
         all_uids = nx.topological_sort(self.graph)
