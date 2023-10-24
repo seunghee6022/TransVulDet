@@ -52,8 +52,8 @@ def objective(trial, args):
     # Suggest hyperparameters
     lr = trial.suggest_loguniform("learning_rate", 1e-5, 1e-2)
     weight_decay = trial.suggest_loguniform("weight_decay", 1e-7, 1e-2)
-    # per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
-    per_device_train_batch_size = 1
+    per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
+    # per_device_train_batch_size = 1
     loss_weight_method = trial.suggest_categorical('loss_weight_method', ['default', 'eqaulize', 'descendants','reachable_leaf_nodes'])
     
     # Create graph from JSON
@@ -100,7 +100,7 @@ def objective(trial, args):
             one_hot = [0] * num_labels
             one_hot[uid_to_dimension[label]] = 1
             one_hot_encoded.append(one_hot) 
-        print("one_hot_encoded",one_hot_encoded) 
+        # print("one_hot_encoded",one_hot_encoded) 
         return torch.tensor(one_hot_encoded)
     
     # Function to tokenize on the fly
@@ -207,7 +207,7 @@ def objective(trial, args):
 
 if __name__ == "__main__":
     torch.cuda.empty_cache()
-    os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+    # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
     # Initialize a new run
     wandb.init(project="TransVulDet", name="HPO_with_small_datasets")
 
@@ -224,14 +224,15 @@ if __name__ == "__main__":
     parser.add_argument('--num-train-epochs', type=int, default=5, help='Number of epoch for training')
     parser.add_argument('--max-length', type=int, default=512, help='Maximum length for token number')
     parser.add_argument('--seed', type=int, default=42, help='Seed')
+    parser.add_argument('--n-gpu', type=int, default=1, help='Number of GPU')
     parser.add_argument('--study-name', type=str, default='HPO_n50_wo_parallelism', help='Optuna study name')
     parser.add_argument('--output-dir', type=str, default='outputs', help='HPO output directory')
-
-
 
     # Parse the command line arguments
     args = parser.parse_args()
     print("MAIN - args",args)
+
+    set_seed(args)
 
     print(os.getcwd())
 
