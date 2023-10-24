@@ -31,7 +31,7 @@ class EarlyStoppingCallback(TrainerCallback):
 class WandbCallback(TrainerCallback):
     def on_log(self, args: TrainingArguments, state: TrainerState, control:TrainerControl, logs=None, **kwargs):
         if logs:
-            if "train_loss" in logs:
+            if "loss" in logs:
                 wandb.log({"train_loss": logs["loss"], "learning_rate":logs["learning_rate"], "epoch":logs["epoch"]})
 
 class OptunaPruningCallback(TrainerCallback):
@@ -39,7 +39,7 @@ class OptunaPruningCallback(TrainerCallback):
         self.trial = trial
         self.max_steps = max_steps
 
-    def on_log(self, args, state, control, logs=None, **kwargs):
+    def on_evaluate(self, args: TrainingArguments, state: TrainerState, control:TrainerControl, logs=None, **kwargs):
         step = state.global_step
 
         # Stop the training if step > max_steps
@@ -49,12 +49,8 @@ class OptunaPruningCallback(TrainerCallback):
             return
         
         metric_for_best_model = "eval_loss"
-        print("state.log_history",state.log_history)
-        
         metrics = state.log_history[-1].get(metric_for_best_model, None)
         print(f"metric log_history:{metrics}")
-        metrics = np.mean([log[metric_for_best_model] for log in logs.values()]) if logs is not None else None
-        print(f"metric np.mean:{metrics}")
         
         # Report intermediate value to optuna
         if metrics is not None:
