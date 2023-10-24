@@ -154,8 +154,8 @@ def objective(trial, args):
         logging_dir='./logs',
         output_dir='./outputs',
         evaluation_strategy="steps",
-        eval_steps=50,  
-        logging_steps=10,
+        eval_steps=500,  
+        logging_steps=100,
         learning_rate=lr,
         remove_unused_columns=False,  # Important for our custom loss function
         disable_tqdm=False,

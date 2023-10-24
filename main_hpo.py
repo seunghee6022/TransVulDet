@@ -169,8 +169,8 @@ def objective(trial, args):
         logging_dir='./logs',
         output_dir='./outputs',
         evaluation_strategy="steps",
-        eval_steps=100,  
-        logging_steps=50,
+        eval_steps=500,  
+        logging_steps=100,
         learning_rate=lr,
         remove_unused_columns=False,  # Important for our custom loss function
         disable_tqdm=False,
@@ -267,7 +267,7 @@ if __name__ == "__main__":
     #     , storage=create_connection("example.db"),
     #     load_if_exists=True
     # )
-    study.optimize(lambda trial: objective(trial, args), n_trials=n_trials, timeout=258500)
+    # study.optimize(lambda trial: objective(trial, args), n_trials=n_trials, timeout=258500)
 
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
