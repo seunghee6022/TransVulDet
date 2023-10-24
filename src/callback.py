@@ -49,6 +49,8 @@ class OptunaPruningCallback(TrainerCallback):
             return
         
         metric_for_best_model = "eval_loss"
+        print("state.log_history",state.log_history)
+        
         metrics = state.log_history[-1].get(metric_for_best_model, None)
         print(f"metric log_history:{metrics}")
         metrics = np.mean([log[metric_for_best_model] for log in logs.values()]) if logs is not None else None

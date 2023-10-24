@@ -99,9 +99,9 @@ def objective(trial, args):
     # Load dataset and make huggingface datasts
   
     data_files = {
-    'train': f'{data_dir}/train_data.csv',
-    'validation': f'{data_dir}/val_data.csv',
-    'test': f'{data_dir}/test_data.csv'
+    'train': f'{data_dir}/train_small_data.csv',
+    'validation': f'{data_dir}/val_small_data.csv',
+    'test': f'{data_dir}/test_small_data.csv'
     }
     
     dataset = load_dataset('csv', data_files=data_files)
@@ -154,8 +154,8 @@ def objective(trial, args):
         logging_dir='./logs',
         output_dir='./outputs',
         evaluation_strategy="steps",
-        eval_steps=5000,  
-        logging_steps=1000,
+        eval_steps=50,  
+        logging_steps=10,
         learning_rate=lr,
         remove_unused_columns=False,  # Important for our custom loss function
         disable_tqdm=False,
