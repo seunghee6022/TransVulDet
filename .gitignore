@@ -136,6 +136,7 @@ data_preprocessing/Bigvul
 data_preprocessing/preprocessed_datasets/*.csv
 temp
 datasets_
+database
 Data
 
 # shell script

@@ -37,6 +37,9 @@ def set_seed(args):
     if args.n_gpu > 0:
         torch.cuda.manual_seed_all(args.seed)
 
+# def get_model_and_tokenizer(args):
+#     return model, tokenizer
+
 # Objective function for Optuna
 def objective(trial, args):
     
@@ -92,17 +95,6 @@ def objective(trial, args):
 
     model.to(device)
 
-    # Define Dataset
-
-    def one_hot_encode(labels):
-        one_hot_encoded = []
-        for label in labels:
-            one_hot = [0] * num_labels
-            one_hot[uid_to_dimension[label]] = 1
-            one_hot_encoded.append(one_hot) 
-        # print("one_hot_encoded",one_hot_encoded) 
-        return torch.tensor(one_hot_encoded)
-    
     # Function to tokenize on the fly
     def encode(example):
         # tokenized_inputs = tokenizer(example['code'], truncation=True, padding=True, max_length=max_length,return_tensors="pt").to(device)
@@ -111,11 +103,12 @@ def objective(trial, args):
         tokenized_inputs['labels'] = example['cwe_id']
         return tokenized_inputs
 
-    # Load dataset and make huggingface datasts_
+    # Load dataset and make huggingface datasts
+  
     data_files = {
-    'train': f'{data_dir}/train_data.csv',
-    'validation': f'{data_dir}/val_data.csv',
-    'test': f'{data_dir}/test_data.csv'
+    'train': f'{data_dir}/train_small_data.csv',
+    'validation': f'{data_dir}/val_small_data.csv',
+    'test': f'{data_dir}/test_small_data.csv'
     }
     
     dataset = load_dataset('csv', data_files=data_files)
@@ -132,6 +125,7 @@ def objective(trial, args):
 
     def compute_metrics(p):
         print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
+
         predictions, labels = p.predictions, p.label_ids
         # print(f"prediction:{predictions.shape} {type(predictions)}\nlabels:{labels.shape}{type(labels)}")
         # print(f"prediction:{predictions}\nlabels:{labels}")
@@ -164,7 +158,7 @@ def objective(trial, args):
         per_device_train_batch_size=per_device_train_batch_size,
         per_device_eval_batch_size=per_device_train_batch_size,
         num_train_epochs=num_train_epochs,
-        max_steps = args.max_steps,
+        max_steps=args.max_steps,
         weight_decay=weight_decay,
         logging_dir='./logs',
         output_dir='./outputs',
@@ -208,8 +202,7 @@ def objective(trial, args):
 if __name__ == "__main__":
     torch.cuda.empty_cache()
     # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
-
-
+   
     # Create an ArgumentParser object
     parser = argparse.ArgumentParser(description="Hyperparameter optimization using Optuna")
 
@@ -225,37 +218,40 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=42, help='Seed')
     parser.add_argument('--gpu-id', type=int, default=0, help='GPU ID')
     parser.add_argument('--n-gpu', type=int, default=1, help='Number of GPU')
-    parser.add_argument('--max-evals', type=int, default=100, help='Maximum number of evaluatoin steps')
+    parser.add_argument('--study-name', type=str, default='HC_equalize_study', help='Optuna study name')
+    parser.add_argument('--max-evals', type=int, default=500, help='Maximum number of evaluatoin steps')
     parser.add_argument('--max-steps', type=int, default=5000, help='Maximum number of training steps')
-    parser.add_argument('--study-name', type=str, default='HC_full_datasets', help='Optuna study name')
     parser.add_argument('--output-dir', type=str, default='outputs', help='HPO output directory')
 
     # Parse the command line arguments
     args = parser.parse_args()
     print("MAIN - args",args)
 
-     # Initialize a new run
-    wandb.init(project="TransVulDet", name=args.study_name)
-
     set_seed(args)
+
+    # Initialize a new run
+    wandb.init(project="TransVulDet", name=args.study_name)
 
     print(os.getcwd())
 
     tpeopts = optuna.samplers.TPESampler.hyperopt_parameters()
-    tpeopts.update({'n_startup_trials': 5})
+    tpeopts.update({'n_startup_trials': 8})
+
     # Initialize Optuna study
     study = optuna.create_study(
         study_name=args.study_name,
         direction="maximize",
-        sampler = optuna.samplers.TPESampler(
-            **tpeopts
-        ),
         pruner=optuna.pruners.HyperbandPruner(
             min_resource=1, max_resource=args.max_evals, reduction_factor=3
         ),
+        sampler = optuna.samplers.TPESampler(
+            **tpeopts
+        ),
+        storage=f"sqlite:///database/{args.study_name}.db",
+        load_if_exists=True,
         
         )
-    study.optimize(lambda trial: objective(trial, args), n_trials=args.num_trials)
+    study.optimize(lambda trial: objective(trial, args), n_trials=args.num_trials, timeout=258500)
     
     # Print results
     print(f"Best trial: {study.best_trial.params}")
