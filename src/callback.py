@@ -35,9 +35,9 @@ class WandbCallback(TrainerCallback):
                 wandb.log({"train_loss": logs["loss"], "learning_rate":logs["learning_rate"], "epoch":logs["epoch"]})
 
 class OptunaPruningCallback(TrainerCallback):
-    def __init__(self, trial, max_steps):
+    def __init__(self, trial, max_eval_steps):
         self.trial = trial
-        self.max_steps = max_steps
+        self.max_steps = max_eval_steps
 
     def on_evaluate(self, args: TrainingArguments, state: TrainerState, control:TrainerControl, logs=None, **kwargs):
         step = state.global_step
@@ -48,7 +48,7 @@ class OptunaPruningCallback(TrainerCallback):
             control.should_training_stop = True
             return
         
-        metric_for_best_model = "eval_loss"
+        metric_for_best_model = "eval_f1"
         metrics = state.log_history[-1].get(metric_for_best_model, None)
         print(f"metric log_history:{metrics}")
         
