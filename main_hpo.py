@@ -70,7 +70,7 @@ def objective(trial, args):
     uid_to_dimension = set_uid_to_dimension(graph)
    
     # Check if a GPU is available and use it, otherwise, use CPU
-    device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
+    device = torch.device(f"cuda:0" if torch.cuda.is_available() else "cpu")
  
     if use_hierarchical_classifier:
         model = BertWithHierarchicalClassifier(model_name, prediction_target_uids, graph, loss_weight_method, embedding_dim)
@@ -223,7 +223,7 @@ if __name__ == "__main__":
     parser.add_argument('--num-train-epochs', type=int, default=5, help='Number of epoch for training')
     parser.add_argument('--max-length', type=int, default=512, help='Maximum length for token number')
     parser.add_argument('--seed', type=int, default=42, help='Seed')
-    parser.add_argument('--gpu-id', type=int, default=0, help='GPU ID')
+    # parser.add_argument('--gpu-id', type=int, default=0, help='GPU ID')
     parser.add_argument('--n-gpu', type=int, default=1, help='Number of GPU')
     parser.add_argument('--max-evals', type=int, default=100, help='Maximum number of evaluatoin steps')
     parser.add_argument('--max-steps', type=int, default=5000, help='Maximum number of training steps')
