@@ -48,7 +48,7 @@ class OptunaPruningCallback(TrainerCallback):
             control.should_training_stop = True
             return
         
-        metric_for_best_model = "eval_f1"
+        metric_for_best_model = "eval_accuracy"
         metrics = state.log_history[-1].get(metric_for_best_model, None)
         print(f"metric log_history:{metrics}")
         

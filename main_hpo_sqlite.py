@@ -73,7 +73,7 @@ def objective(trial, args):
     uid_to_dimension = set_uid_to_dimension(graph)
    
     # Check if a GPU is available and use it, otherwise, use CPU
-    device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
+    device = torch.device(f"cuda:0" if torch.cuda.is_available() else "cpu")
  
     if use_hierarchical_classifier:
         model = BertWithHierarchicalClassifier(model_name, prediction_target_uids, graph, loss_weight_method, embedding_dim)
@@ -82,7 +82,7 @@ def objective(trial, args):
         model = BertForSequenceClassification.from_pretrained(model_name, config=config)
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    print(f"use_hierarchical_classifier:{use_hierarchical_classifier} --> \nmodel:{model}")
+    # print(f"use_hierarchical_classifier:{use_hierarchical_classifier} --> \nmodel:{model}")
     wandb.watch(model)
 
     # Freeze all parameters of the model
@@ -137,15 +137,15 @@ def objective(trial, args):
         # idx_labels = np.argmax(labels, axis=-1)
         # labels = model.dimension_to_cwe_id(idx_labels)
         print(f"labels: {labels}")
-        precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted')
+        # precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted')
         acc = accuracy_score(labels, predictions)
         balanced_acc = balanced_accuracy_score(labels, predictions)
         return {
             "balanced_accuracy":balanced_acc,
             'accuracy': acc,
-            'f1': f1,
-            'precision': precision,
-            'recall': recall
+            # 'f1': f1,
+            # 'precision': precision,
+            # 'recall': recall
         }
 
     # Define loss function, optimizer and scheduler
@@ -157,19 +157,19 @@ def objective(trial, args):
     training_args = TrainingArguments(
         per_device_train_batch_size=per_device_train_batch_size,
         per_device_eval_batch_size=per_device_train_batch_size,
-        num_train_epochs=num_train_epochs,
-        max_steps=args.max_steps,
+        # num_train_epochs=num_train_epochs,
+        max_steps=args.eval_steps*args.max_evals,
         weight_decay=weight_decay,
         logging_dir='./logs',
         output_dir='./outputs',
         evaluation_strategy="steps",
-        eval_steps=500,  
+        eval_steps=args.eval_steps,  
         logging_steps=100,
         learning_rate=lr,
         remove_unused_columns=False,  # Important for our custom loss function
         disable_tqdm=False,
         load_best_model_at_end = True,
-        metric_for_best_model = "f1",
+        metric_for_best_model = "accuracy",
         greater_is_better = True,
     )
 
@@ -196,7 +196,7 @@ def objective(trial, args):
 
     # Return the metric we want to optimize (e.g., negative of accuracy for maximization)
     # return metrics["eval_balanced_accuracy"]
-    return metrics["eval_f1"]
+    return metrics["eval_accuracy"]
     
 
 if __name__ == "__main__":
@@ -216,11 +216,12 @@ if __name__ == "__main__":
     parser.add_argument('--num-train-epochs', type=int, default=5, help='Number of epoch for training')
     parser.add_argument('--max-length', type=int, default=512, help='Maximum length for token number')
     parser.add_argument('--seed', type=int, default=42, help='Seed')
-    parser.add_argument('--gpu-id', type=int, default=0, help='GPU ID')
+    # parser.add_argument('--gpu-id', type=int, default=0, help='GPU ID')
     parser.add_argument('--n-gpu', type=int, default=1, help='Number of GPU')
     parser.add_argument('--study-name', type=str, default='HC_equalize_study', help='Optuna study name')
-    parser.add_argument('--max-evals', type=int, default=500, help='Maximum number of evaluatoin steps')
-    parser.add_argument('--max-steps', type=int, default=5000, help='Maximum number of training steps')
+    parser.add_argument('--max-evals', type=int, default=500, help='Maximum number of evaluation steps')
+    parser.add_argument('--eval-steps', type=int, default=500, help='Number of update steps between two evaluations')
+    # parser.add_argument('--max-steps', type=int, default=5000, help='Maximum number of training steps')
     parser.add_argument('--output-dir', type=str, default='outputs', help='HPO output directory')
 
     # Parse the command line arguments
