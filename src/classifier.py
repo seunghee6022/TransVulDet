@@ -1,14 +1,50 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from transformers import BertModel, BertConfig
 import networkx as nx
 
-class BertWithHierarchicalClassifier(nn.Module):
+from transformers import (
+    AutoTokenizer,AutoModel,
+    BertConfig, BertForSequenceClassification,
+    RobertaConfig, RobertaForSequenceClassification,
+    DistilBertConfig, DistilBertForSequenceClassification,
+    T5Config, T5EncoderModel
+)
+# import other necessary modules and classes
+
+def get_model_and_tokenizer(args, num_labels, prediction_target_uids, graph):
+    # Initialize tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+
+    if args.use_hierarchical_classifier:
+        # Assuming TransformerWithHierarchicalClassifier is adaptable to work with various models
+        model = TransformerWithHierarchicalClassifier(
+            args.model_name, prediction_target_uids, graph, args.loss_weight, embedding_dim=num_labels)
+    else:
+        # Initialize the model based on the model name
+        if args.model_name == 'bert-base-uncased':
+            config = BertConfig.from_pretrained(args.model_name, num_labels=num_labels)
+            model = BertForSequenceClassification.from_pretrained(args.model_name, config=config)
+        elif args.model_name in ['roberta-base', 'microsoft/coderoberta-base', 'microsoft/codebert-base']:
+            config = RobertaConfig.from_pretrained(args.model_name, num_labels=num_labels)
+            model = RobertaForSequenceClassification.from_pretrained(args.model_name, config=config)
+        elif args.model_name == 'distilbert-base-uncased':
+            config = DistilBertConfig.from_pretrained(args.model_name, num_labels=num_labels)
+            model = DistilBertForSequenceClassification.from_pretrained(args.model_name, config=config)
+        elif args.model_name == 't5-small':
+            # T5 for sequence classification
+            config = T5Config.from_pretrained("t5-small", num_labels=num_labels)
+            model = T5EncoderModel.from_pretrained("t5-small", config=config)
+        else:
+            raise ValueError(f"Model name '{args.model_name}' is not supported or not suitable for sequence classification.")
+
+    return model, tokenizer
+
+class TransformerWithHierarchicalClassifier(nn.Module):
     def __init__(self, model_name, prediction_target_uids, graph, _weighting='equalize',embedding_dim=768):
-        super(BertWithHierarchicalClassifier, self).__init__()
+        super(TransformerWithHierarchicalClassifier, self).__init__()
         self.model_name = model_name
-        self.model = BertModel.from_pretrained(self.model_name)
+        self.model = AutoModel.from_pretrained(self.model_name)
         
         self.input_dim = self.model.config.hidden_size
         self.embedding_dim = embedding_dim
@@ -28,17 +64,6 @@ class BertWithHierarchicalClassifier(nn.Module):
         self._weighting = _weighting
         self.loss_weights = np.ones(len(self.uid_to_dimension))
         self.get_loss_weight()
-    
-    # def config(self):
-    #     print("config is called!",self.model.config)
-    #     # print(self.model.config.hidden_size)
-    #     # if 'hidden_size' not in self.model.config.keys():
-    #     #     self.model.config['hidden_size'] = self.embedding_dim
-    #     #     print(self.model.config)
-    #     config = BertConfig.from_pretrained(self.model_name, num_labels=self.graph.number_of_nodes() )
-    #     print("config is BertConfig.from_pretrained",config)
-    #     return config
-    
 
     def set_uid_to_dimension_and_topo_sorted_uids(self):
         all_uids = nx.topological_sort(self.graph)
@@ -122,7 +147,7 @@ class BertWithHierarchicalClassifier(nn.Module):
         print(f"self._weighting == {self._weighting} --> self.loss_weights = {self.loss_weights}")
 
     def forward(self, input_ids, attention_mask=None, labels=None, token_type_ids=None, position_ids=None, head_mask=None, inputs_embeds=None):
-        # print("INSIDE BertWithHierarchicalClassifier Forward")
+        # print("INSIDE TransforerWithHierarchicalClassifier Forward")
         outputs = self.model(
             input_ids,
             attention_mask=attention_mask,
@@ -131,11 +156,24 @@ class BertWithHierarchicalClassifier(nn.Module):
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
         )
+
+        # Original Code
+        # cls_output = outputs[1] # 1: pooler_output --> shape (batch_size:8, hidden_size:768), 0: hidden_states
+        # print("cls_output = outputs[1]", cls_output)
+        # logits = self.classifier(cls_output)
+        # print("logits",logits)
+
+
         # use the [CLS] token representation as features for hierarchical classifier
         # print("outputs", outputs)
-        cls_output = outputs[1] # 1: pooler_output --> shape (batch_size:8, hidden_size:768), 0: hidden_states
+        # Use the last hidden state
+        last_hidden_state = outputs.last_hidden_state  # Shape: (batch_size, sequence_length, hidden_size)
+        # print("last_hidden_state", last_hidden_state)
+        cls_output = last_hidden_state[:, 0, :]  # Take the representation of [CLS] token - [batch_size, tokens, hidden_dim] CLS token is the first token of last hidden state
+        # print("cls_output = last_hidden_state[:, 0, :] ", cls_output)
         logits = self.classifier(cls_output)
-        # print("logits---",logits.shape)
+        # print("logits", logits)
+        
         if labels is not None:
             loss = self.loss(logits, labels)
             return loss, logits
