@@ -158,3 +158,8 @@ plots
 wandb
 
 user@elektra.stat.uni-muenchen.de
+
+# debug
+main_hpo_sqlite_verbose.py
+src/trainer_debug.py
+src/classifier_debug.py
