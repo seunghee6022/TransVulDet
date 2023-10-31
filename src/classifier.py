@@ -85,7 +85,7 @@ class TransformerWithHierarchicalClassifier(nn.Module):
                 occurences[affected_uid] += 1
 
         occurrence_vector = np.array([occurences[uid] for uid in self.uid_to_dimension])
-        print(f"{occurrence_vector}:occurrence_vector")
+        # print(f"{occurrence_vector}:occurrence_vector")
 
         # (2) Calculate weight vector
         if self._weighting == "default":
@@ -144,17 +144,17 @@ class TransformerWithHierarchicalClassifier(nn.Module):
                 )
                 raise err
         self.loss_weights = torch.tensor(self.loss_weights, dtype=torch.float32)
-        print(f"self._weighting == {self._weighting} --> self.loss_weights = {self.loss_weights}")
+        # print(f"self._weighting == {self._weighting} --> self.loss_weights = {self.loss_weights}")
 
     def forward(self, input_ids, attention_mask=None, labels=None, token_type_ids=None, position_ids=None, head_mask=None, inputs_embeds=None):
         # print("INSIDE TransforerWithHierarchicalClassifier Forward")
         outputs = self.model(
             input_ids,
             attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask,
-            inputs_embeds=inputs_embeds,
+            # token_type_ids=token_type_ids,
+            # position_ids=position_ids,
+            # head_mask=head_mask,
+            # inputs_embeds=inputs_embeds,
         )
 
         # Original Code

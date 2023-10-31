@@ -21,7 +21,7 @@ class CustomTrainer(Trainer):
         self.num_labels = len(uid_to_dimension)
 
     def one_hot_encode(self, labels):
-        print("labels:",labels)
+        # print("labels:",labels)
         one_hot_encoded = []
         for label in labels:
             one_hot = [0] * self.num_labels

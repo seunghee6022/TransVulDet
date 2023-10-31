@@ -20,7 +20,7 @@ from sklearn.metrics import accuracy_score, precision_recall_fscore_support, bal
 import optuna
 from optuna.trial import TrialState
 from datasets import load_dataset
-
+os.environ["WANDB_SILENT"] = "true"
 import random
 import argparse
 import wandb
@@ -41,9 +41,9 @@ def set_seed(args):
 def objective(trial, args):
   
     # Suggest hyperparameters
-    lr = trial.suggest_loguniform("learning_rate", 1e-5, 1e-2)
-    weight_decay = trial.suggest_loguniform("weight_decay", 1e-6, 1e-1)
-    per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 4, 32, log=True)
+    lr = trial.suggest_loguniform("learning_rate", 1e-5, 1e-1)
+    weight_decay = trial.suggest_loguniform("weight_decay", 1e-7, 1e-2)
+    per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
     loss_weight = trial.suggest_categorical('loss_weight_method', ['default', 'eqaulize', 'descendants','reachable_leaf_nodes'])
     
     args.loss_weight = loss_weight
@@ -61,7 +61,7 @@ def objective(trial, args):
     uid_to_dimension = set_uid_to_dimension(graph)
    
     # Check if a GPU is available and use it, otherwise, use CPU
-    device = torch.device(f"cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
  
     model, tokenizer = get_model_and_tokenizer(args, num_labels, prediction_target_uids, graph)
     wandb.watch(model)
@@ -92,9 +92,9 @@ def objective(trial, args):
     # 'test': f'{args.data_dir}/test_small_data.csv'
     # }
     data_files = {
-    'train': f'{args.data_dir}/train_data.csv',
-    'validation': f'{args.data_dir}/val_data.csv',
-    'test': f'{args.data_dir}/test_data.csv'
+        'train': f"{args.data_dir}/train_data.csv",
+        'validation': f"{args.data_dir}/val_data.csv",
+        'test': f"{args.data_dir}/test_data.csv",
     }
     
     dataset = load_dataset('csv', data_files=data_files)
@@ -190,7 +190,7 @@ if __name__ == "__main__":
     parser.add_argument('--max-length', type=int, default=512, help='Maximum length for token number')
     parser.add_argument('--seed', type=int, default=42, help='Seed')
     parser.add_argument('--n-gpu', type=int, default=1, help='Number of GPU')
-    parser.add_argument('--study-name', type=str, default='HC_full', help='Optuna study name')
+    parser.add_argument('--study-name', type=str, default='HC_BERT', help='Optuna study name')
     parser.add_argument('--max-evals', type=int, default=500, help='Maximum number of evaluation steps')
     parser.add_argument('--eval-steps', type=int, default=500, help='Number of update steps between two evaluations')
     parser.add_argument('--output-dir', type=str, default='outputs', help='HPO output directory')
@@ -198,11 +198,12 @@ if __name__ == "__main__":
 
     # Parse the command line arguments
     args = parser.parse_args()
-    if args.use_hierarchical_classifier:
-        args.study_name = f"{args.study_name}_{args.loss_weight}"
-    else:
-        args.study_name = f"{args.study_name}_CE"
+    # if args.use_hierarchical_classifier:
+    #     args.study_name = f"{args.study_name}_{args.loss_weight}"
+    # else:
+    #     args.study_name = f"{args.study_name}_CE"
     
+    args.study_name = f"{args.study_name}_max_evals{args.max_evals}_eval_steps{args.eval_steps}"
     print("MAIN - args",args)
 
     set_seed(args)
@@ -246,5 +247,3 @@ if __name__ == "__main__":
     print("  Number of finished trials: ", len(study.trials))
     print("  Number of pruned trials: ", len(pruned_trials))
     print("  Number of complete trials: ", len(complete_trials))
-
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
