@@ -5,8 +5,6 @@ from sqlite3 import Error
 from pathlib import Path
 import os
 
-print("Path.cwd()",Path.cwd())
-print("Path.cwd().parents[0],",Path.cwd().parents[0])
 def create_connection(db_file):
     """
     create a connection to sqlite3 database
@@ -21,12 +19,8 @@ def create_connection(db_file):
     return conn
 
 DATA_PATH = Path.cwd().parents[0]/ 'Data'
-FIGURE_PATH = Path.cwd() / 'CVEfixes/figures'
-RESULT_PATH = Path.cwd() / 'CVEfixes/results'
-
-print("Path.cwd()",Path.cwd())
-print("Path.cwd().parents[0],",Path.cwd().parents[0])
-print("DATA_PATH",DATA_PATH)
+FIGURE_PATH = Path.cwd() / 'figures'
+RESULT_PATH = Path.cwd() / 'results'
 
 Path(DATA_PATH).mkdir(parents=True, exist_ok=True)
 Path(FIGURE_PATH).mkdir(parents=True, exist_ok=True)
@@ -36,8 +30,9 @@ conn = create_connection(DATA_PATH / "CVEfixes.db")
 cursor = conn.cursor()
 cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
 print(cursor.fetchall())
+
 join_query = """
-SELECT cc.cwe_id, mc.code
+SELECT cc.cwe_id, mc.code, cc.cve_id
 FROM file_change f
 JOIN fixes fx ON f.hash = fx.hash
 JOIN cve cv ON fx.cve_id = cv.cve_id
@@ -45,10 +40,21 @@ JOIN cwe_classification cc ON cv.cve_id = cc.cve_id
 JOIN method_change mc ON f.file_change_id = mc.file_change_id
 WHERE cc.cwe_id NOT IN ('NVD-CWE-Other', 'NVD-CWE-noinfo')
 """
+small_query = """
+SELECT cc.cwe_id, mc.code, cc.cve_id
+FROM file_change f, fixes fx, cve cv, cwe_classification cc, method_change mc
+WHERE f.hash = fx.hash 
+AND fx.cve_id = cv.cve_id 
+AND cv.cve_id = cc.cve_id 
+AND f.file_change_id = mc.file_change_id
+"""
 
 # Execute the query and fetch data into a DataFrame
 df = pd.read_sql_query(join_query, conn)
-print(df.shape[0])
+
+print("# of total rows before dropping duplicates: ",df.shape[0])
+df = df.drop_duplicates()
+print("# of total rows after dropping duplicates: ",df.shape[0])
 
 # Assuming `df` is your DataFrame
 for column in df.columns:
@@ -58,7 +64,6 @@ for column in df.columns:
 
 # Close the connection
 conn.close()
-
 
 print("# of total rows: ",df.shape[0])
 print(df.columns)
@@ -119,7 +124,7 @@ vul_counts = df['vul'].value_counts()
 print("\nVul counts:")
 print(vul_counts)
 
-df = df[['code','cwe_id','vul']]
+df = df[['code','cwe_id','cve_id','vul']]
 print("# of total rows: ",df.shape[0])
 print(df.columns)
 print(df.head(5))
