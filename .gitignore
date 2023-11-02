@@ -146,6 +146,7 @@ Data
 outputs
 logs
 *.out
+slurm_outputs
 
 # backup
 backup
@@ -163,3 +164,4 @@ user@elektra.stat.uni-muenchen.de
 main_hpo_sqlite_verbose.py
 src/trainer_debug.py
 src/classifier_debug.py
+test.py

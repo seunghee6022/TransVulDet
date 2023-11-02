@@ -3,6 +3,10 @@ import torch.nn as nn
 import pandas as pd
 import numpy as np
 import os
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+os.environ["WANDB_SILENT"] = "true"
+
 import json
 from transformers import AutoTokenizer, BertTokenizer, BertForSequenceClassification, TrainingArguments, DataCollatorWithPadding
 from transformers import AdamW, get_linear_schedule_with_warmup
@@ -20,13 +24,14 @@ from sklearn.metrics import accuracy_score, precision_recall_fscore_support, bal
 import optuna
 from optuna.trial import TrialState
 from datasets import load_dataset
-os.environ["WANDB_SILENT"] = "true"
+
 import random
 import argparse
 import wandb
 
 # from sql_db import create_connection
 import joblib
+from torch.optim import AdamW
 
 torch.cuda.empty_cache()
 
@@ -41,17 +46,19 @@ def set_seed(args):
 def objective(trial, args):
   
     # Suggest hyperparameters
-    lr = trial.suggest_loguniform("learning_rate", 1e-5, 1e-1)
-    weight_decay = trial.suggest_loguniform("weight_decay", 1e-7, 1e-2)
+    lr = trial.suggest_float("learning_rate", 1e-6, 1e-1, log=True)
+    weight_decay = trial.suggest_float("weight_decay", 1e-7, 1e-2, log=True)
     per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
+    classifier_factor = trial.suggest_float(1, 100, log=True)
     loss_weight = trial.suggest_categorical('loss_weight_method', ['default', 'eqaulize', 'descendants','reachable_leaf_nodes'])
     
-    args.loss_weight = loss_weight
+    args.loss_weight = loss_weight # should remove
 
     # Create graph from JSON
     with open(args.node_paths_dir, 'r') as f:
         paths_dict_data = json.load(f)
    
+    # actual targets to be predicted
     prediction_target_uids = [int(key) for key in paths_dict_data.keys()] # 204
     graph = create_graph_from_json(paths_dict_data, max_depth=None)
 
@@ -73,6 +80,8 @@ def objective(trial, args):
     # Unfreeze the classifier head: to fine-tune only the classifier head
     for param in model.classifier.parameters():
         param.requires_grad = True
+
+    
 
     model.to(device)
 
@@ -108,16 +117,16 @@ def objective(trial, args):
     print("TRAIN/VAL/TEST SET LENGTHS:",len(train_dataset), len(val_dataset), len(test_dataset))
 
     def compute_metrics(p):
-        print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
+        # print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
 
         predictions, labels = p.predictions, p.label_ids
         pred_dist = model.deembed_dist(predictions) # get probabilities of each nodes
         # print(f"pred_dist: \n{pred_dist}")
         pred_labels = model.dist_to_cwe_ids(pred_dist)
         predictions = pred_labels
-        print(f"pred_labels:{pred_labels}")
-        print(f"labels: {labels}")
-        precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted')
+        # print(f"pred_labels:{pred_labels}")
+        # print(f"labels: {labels}")
+        precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted', zero_division=0.0, labels=prediction_target_uids)
         acc = accuracy_score(labels, predictions)
         balanced_acc = balanced_accuracy_score(labels, predictions)
         return {
@@ -129,25 +138,44 @@ def objective(trial, args):
         }
 
   
-    data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+    # data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+
+    eval_steps = args.eval_samples/per_device_train_batch_size
 
     training_args = TrainingArguments(
         per_device_train_batch_size=per_device_train_batch_size,
         per_device_eval_batch_size=per_device_train_batch_size,
-        max_steps=args.eval_steps*args.max_evals,
+        max_steps=eval_steps*args.max_evals,
         weight_decay=weight_decay,
         logging_dir='./logs',
         output_dir='./outputs',
         evaluation_strategy="steps",
-        eval_steps=args.eval_steps,  
+        eval_steps=eval_steps,  
         logging_steps=100,
         learning_rate=lr,
         remove_unused_columns=False,  # Important for our custom loss function
-        disable_tqdm=False,
+        disable_tqdm=True,
         load_best_model_at_end = True,
         metric_for_best_model = args.eval_metric,
         greater_is_better = True,
     )
+
+    adam_kwargs = {
+        "betas": (training_args.adam_beta1, training_args.adam_beta2),
+        "eps": training_args.adam_epsilon,
+    }
+    # Parameters of the base model without the classification head
+    if args.use_hierarchical_classifier:
+        base_params = list(model.model.parameters())
+    else:
+        base_params = list(model.bert.parameters())
+        # Parameters of the classification head
+    classifier_params = list(model.classifier.parameters())
+    base_lr = lr
+    classifier_lr = base_lr*classifier_factor
+
+    optimizer = AdamW([ { "params":  base_params, "lr": base_lr}, {"params": classifier_params, "lr": classifier_lr} ], **adam_kwargs)
+
 
     trainer = CustomTrainer(
         use_hierarchical_classifier = args.use_hierarchical_classifier,
@@ -158,7 +186,7 @@ def objective(trial, args):
         eval_dataset=val_dataset,
         compute_metrics=compute_metrics,
         tokenizer=tokenizer,
-        data_collator=data_collator,
+        optimizers=(optimizer, None),
         callbacks=[OptunaPruningCallback(trial=trial, args=args),WandbCallback],  
         # callbacks=[EarlyStoppingCallback(patience=5, threshold=0),WandbCallback],
     )
@@ -185,14 +213,14 @@ if __name__ == "__main__":
     parser.add_argument('--model-name', type=str, default='bert-base-uncased', help='Name of the model to use')
     parser.add_argument('--num-trials', type=int, default=10, help='Number of trials for Optuna')
     parser.add_argument('--use-hierarchical-classifier', action='store_true', help='Flag for hierarchical classification') #--use-hierarchical-classifier --> true
-    parser.add_argument('--loss-weight', type=str, default='equalize', help="Loss weight type for Hierarchical classification loss, options: 'default', 'eqaulize', 'descendants','reachable_leaf_nodes'")
+    parser.add_argument('--loss-weight', type=str, default='equalize', help="Loss weight type for Hierarchical classification loss, options: 'default', 'equalize', 'descendants','reachable_leaf_nodes'")
     parser.add_argument('--num-train-epochs', type=int, default=5, help='Number of epoch for training')
     parser.add_argument('--max-length', type=int, default=512, help='Maximum length for token number')
     parser.add_argument('--seed', type=int, default=42, help='Seed')
     parser.add_argument('--n-gpu', type=int, default=1, help='Number of GPU')
     parser.add_argument('--study-name', type=str, default='HC_BERT', help='Optuna study name')
     parser.add_argument('--max-evals', type=int, default=500, help='Maximum number of evaluation steps')
-    parser.add_argument('--eval-steps', type=int, default=500, help='Number of update steps between two evaluations')
+    parser.add_argument('--eval-samples', type=int, default=3200, help='Number of training samples between two evaluations. It should be divisible by 32')
     parser.add_argument('--output-dir', type=str, default='outputs', help='HPO output directory')
     parser.add_argument('--eval-metric', type=str, default='f1', help='Evaluation metric')
 
@@ -202,8 +230,10 @@ if __name__ == "__main__":
     #     args.study_name = f"{args.study_name}_{args.loss_weight}"
     # else:
     #     args.study_name = f"{args.study_name}_CE"
-    
-    args.study_name = f"{args.study_name}_max_evals{args.max_evals}_eval_steps{args.eval_steps}"
+    if args.eval_samples%32:
+        raise ValueError(f"--eval-samples {args.eval_samples} is not divisible by 32")
+
+    args.study_name = f"{args.study_name}_max_evals{args.max_evals}_eval_samples{args.eval_samples}"
     print("MAIN - args",args)
 
     set_seed(args)
