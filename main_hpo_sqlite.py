@@ -42,6 +42,18 @@ def set_seed(args):
     if args.n_gpu > 0:
         torch.cuda.manual_seed_all(args.seed)
 
+def map_predictions_to_labels(predictions, uid_to_dimension):
+    pred_labels = []
+
+    for pred in predictions:
+        # Find the index of the max softmax probability
+        softmax_idx = np.argmax(pred)
+        uid = list(uid_to_dimension.keys())[softmax_idx]
+        pred_labels.append(uid_to_dimension[uid])
+
+    return pred_labels
+
+
 # Objective function for Optuna
 def objective(trial, args):
   
@@ -73,7 +85,7 @@ def objective(trial, args):
     model, tokenizer = get_model_and_tokenizer(args, num_labels, prediction_target_uids, graph)
     wandb.watch(model)
 
-    print(model.parameters())
+    print(model)
     # Freeze all parameters of the model
     for param in model.parameters():
         param.requires_grad = False
@@ -116,12 +128,16 @@ def objective(trial, args):
         # print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
 
         predictions, labels = p.predictions, p.label_ids
+        
         if args.use_hierarchical_classifier:
             pred_dist = model.deembed_dist(predictions) # get probabilities of each nodes
             pred_labels = model.dist_to_cwe_ids(pred_dist)
-            predictions = pred_labels
-        # print(f"pred_labels:{pred_labels}")
-        # print(f"labels: {labels}")
+        else:
+            pred_labels = map_predictions_to_labels(predictions, uid_to_dimension)
+        predictions = pred_labels
+
+        print(f"predictions:{len(predictions)}{predictions}")
+        print(f"labels: {len(labels)}{labels}")
         precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted', zero_division=0.0, labels=prediction_target_uids)
         acc = accuracy_score(labels, predictions)
         balanced_acc = balanced_accuracy_score(labels, predictions)
