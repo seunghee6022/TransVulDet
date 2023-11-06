@@ -96,19 +96,23 @@ def show_tree_graph(graph):
     nx.draw(G, pos=pos, with_labels=True, node_size=100, node_color="skyblue",font_size=4, width=1)
     # Set the title for the figure
     plt.title("Directed Acyclic Graph for CWE Hierarchy")
+    # Save the plot as an image (e.g., PNG, JPEG, PDF)
+    plt.savefig("figures/filtered_cwe_DAG.png")
+
     plt.show()
 
 
 
 if __name__ == "__main__":
     print(os.getcwd())
-    total_cwe_id_list_dir='data_preprocessing/preprocessed_datasets/total_cwe_id_list.csv'
-    node_path_dir='datasets_/graph_all_paths.json'
-    validate_all_nodes_in_total_cwe_id_list(total_cwe_id_list_dir, node_path_dir)
-#     # Create graph from JSON
-#     paths_file = 'graph_all_paths.json'
-#     with open(paths_file, 'r') as f:
-#         paths_dict_data = json.load(f)
+    # total_cwe_id_list_dir='data_preprocessing/preprocessed_datasets/total_cwe_id_list.csv'
+    # node_path_dir='datasets_/graph_all_paths.json'
+    # validate_all_nodes_in_total_cwe_id_list(total_cwe_id_list_dir, node_path_dir)
+    # Create graph from JSON
+    paths_file = 'data_preprocessing/preprocessed_datasets/debug_datasets/graph_filtered_cwe_paths.json'
+    # paths_file = 'data_preprocessing/preprocessed_datasets/debug_datasets/graph_all_paths.json'
+    with open(paths_file, 'r') as f:
+        paths_dict_data = json.load(f)
     
 #     mvd_df = pd.read_csv('MVD_6.csv', index_col=0)
 #     print(mvd_df)
@@ -116,10 +120,10 @@ if __name__ == "__main__":
 #     labels = list(mvd_df['cwe_id'])
 #     print(type(labels), labels)
 
-#     max_depth = None
-#     G = create_graph_from_json(paths_dict_data, max_depth)
-#     # Draw the graph in a tree style
-#     # show_tree_graph(G)
+    max_depth = None
+    G = create_graph_from_json(paths_dict_data, max_depth)
+    # Draw the graph in a tree style
+    show_tree_graph(G)
 
 #     # Example of using the classifier
 #     input_dim = 10
