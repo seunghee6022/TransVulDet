@@ -206,7 +206,7 @@ if __name__ == "__main__":
 
     # Add arguments
     # parser.add_argument('--data-dir', type=str, default='datasets_', help='Path to the dataset directory')
-    parser.add_argument('--node-paths-dir', type=str, default='data_preprocessing/preprocessed_datasets/debug_datasets/graph_all_paths.json', help='Path to the dataset directory')
+    parser.add_argument('--node-paths-dir', type=str, default='data_preprocessing/preprocessed_datasets/debug_datasets/graph_final_cwe_paths.json', help='Path to the dataset directory')
     parser.add_argument('--train-data-dir', type=str, default='datasets_/train_dataset.csv', help='Path to the train dataset directory')
     parser.add_argument('--val-data-dir', type=str, default='datasets_/balanced_validation_dataset.csv', help='Path to the val dataset directory')
     parser.add_argument('--test-data-dir', type=str, default='datasets_/test_dataset.csv', help='Path to the test dataset directory')
@@ -220,7 +220,7 @@ if __name__ == "__main__":
     parser.add_argument('--max-length', type=int, default=512, help='Maximum length for token number')
     parser.add_argument('--seed', type=int, default=42, help='Seed')
     parser.add_argument('--n-gpu', type=int, default=1, help='Number of GPU')
-    parser.add_argument('--study-name', type=str, default='HC_BERT_bc', help='Optuna study name')
+    parser.add_argument('--study-name', type=str, default='HC_BERT', help='Optuna study name')
     parser.add_argument('--max-evals', type=int, default=500, help='Maximum number of evaluation steps')
     parser.add_argument('--eval-samples', type=int, default=4800, help='Number of training samples between two evaluations. It should be divisible by 32')
     parser.add_argument('--output-dir', type=str, default='outputs', help='HPO output directory')
