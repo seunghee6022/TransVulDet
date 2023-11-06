@@ -73,6 +73,7 @@ def objective(trial, args):
     model, tokenizer = get_model_and_tokenizer(args, num_labels, prediction_target_uids, graph)
     wandb.watch(model)
 
+    print(model.parameters())
     # Freeze all parameters of the model
     for param in model.parameters():
         param.requires_grad = False
@@ -115,9 +116,8 @@ def objective(trial, args):
         # print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
 
         predictions, labels = p.predictions, p.label_ids
-        pred_dist = model.deembed_dist(predictions) # get probabilities of each nodes
-        # print(f"pred_dist: \n{pred_dist}")
         if args.use_hierarchical_classifier:
+            pred_dist = model.deembed_dist(predictions) # get probabilities of each nodes
             pred_labels = model.dist_to_cwe_ids(pred_dist)
             predictions = pred_labels
         # print(f"pred_labels:{pred_labels}")
@@ -165,7 +165,8 @@ def objective(trial, args):
     if args.use_hierarchical_classifier:
         base_params = list(model.model.parameters())
     else:
-        base_params = list(model.bert.parameters())
+        base_params = [p for n, p in model.named_parameters() if 'classifier' not in n]
+        # base_params = list(model.bert.parameters()) 
         # Parameters of the classification head
     classifier_params = list(model.classifier.parameters())
     base_lr = lr
