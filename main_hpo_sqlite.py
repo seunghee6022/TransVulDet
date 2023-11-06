@@ -136,8 +136,8 @@ def objective(trial, args):
             pred_labels = map_predictions_to_labels(predictions, uid_to_dimension)
         predictions = pred_labels
 
-        print(f"predictions:{len(predictions)}{predictions}")
-        print(f"labels: {len(labels)}{labels}")
+        # print(f"predictions:{len(predictions)}{predictions}")
+        # print(f"labels: {len(labels)}{labels}")
         precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted', zero_division=0.0, labels=prediction_target_uids)
         acc = accuracy_score(labels, predictions)
         balanced_acc = balanced_accuracy_score(labels, predictions)
