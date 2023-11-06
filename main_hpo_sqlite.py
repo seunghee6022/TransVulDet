@@ -49,10 +49,10 @@ def objective(trial, args):
     lr = trial.suggest_float("learning_rate", 1e-6, 1e-1, log=True)
     weight_decay = trial.suggest_float("weight_decay", 1e-7, 1e-2, log=True)
     per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
-    classifier_factor = trial.suggest_float(1, 100, log=True)
-    loss_weight = trial.suggest_categorical('loss_weight_method', ['default', 'eqaulize', 'descendants','reachable_leaf_nodes'])
+    classifier_factor = trial.suggest_float("classifier_factor",1, 100, log=True)
+    # loss_weight = trial.suggest_categorical('loss_weight_method', ['default', 'eqaulize', 'descendants','reachable_leaf_nodes'])
     
-    args.loss_weight = loss_weight # should remove
+    # args.loss_weight = loss_weight # should remove
 
     # Create graph from JSON
     with open(args.node_paths_dir, 'r') as f:
@@ -95,15 +95,10 @@ def objective(trial, args):
 
     # Load dataset and make huggingface datasts
   
-    # data_files = {
-    # 'train': f'{args.data_dir}/train_small_data.csv',
-    # 'validation': f'{args.data_dir}/val_small_data.csv',
-    # 'test': f'{args.data_dir}/test_small_data.csv'
-    # }
     data_files = {
-        'train': f"{args.data_dir}/train_data.csv",
-        'validation': f"{args.data_dir}/val_data.csv",
-        'test': f"{args.data_dir}/test_data.csv",
+    'train': f'{args.train_data_dir}',
+    'validation': f'{args.val_data_dir}',
+    'test': f'{args.test_data_dir}',
     }
     
     dataset = load_dataset('csv', data_files=data_files)
@@ -122,8 +117,9 @@ def objective(trial, args):
         predictions, labels = p.predictions, p.label_ids
         pred_dist = model.deembed_dist(predictions) # get probabilities of each nodes
         # print(f"pred_dist: \n{pred_dist}")
-        pred_labels = model.dist_to_cwe_ids(pred_dist)
-        predictions = pred_labels
+        if args.use_hierarchical_classifier:
+            pred_labels = model.dist_to_cwe_ids(pred_dist)
+            predictions = pred_labels
         # print(f"pred_labels:{pred_labels}")
         # print(f"labels: {labels}")
         precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted', zero_division=0.0, labels=prediction_target_uids)
@@ -140,7 +136,7 @@ def objective(trial, args):
   
     # data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
-    eval_steps = args.eval_samples/per_device_train_batch_size
+    eval_steps = int(round(args.eval_samples/per_device_train_batch_size, -1))
 
     training_args = TrainingArguments(
         per_device_train_batch_size=per_device_train_batch_size,
@@ -151,7 +147,8 @@ def objective(trial, args):
         output_dir='./outputs',
         evaluation_strategy="steps",
         eval_steps=eval_steps,  
-        logging_steps=100,
+        save_steps=eval_steps,
+        logging_steps=eval_steps,
         learning_rate=lr,
         remove_unused_columns=False,  # Important for our custom loss function
         disable_tqdm=True,
@@ -208,8 +205,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Hyperparameter optimization using Optuna")
 
     # Add arguments
-    parser.add_argument('--data-dir', type=str, default='datasets_', help='Path to the dataset directory')
+    # parser.add_argument('--data-dir', type=str, default='datasets_', help='Path to the dataset directory')
     parser.add_argument('--node-paths-dir', type=str, default='data_preprocessing/preprocessed_datasets/debug_datasets/graph_all_paths.json', help='Path to the dataset directory')
+    parser.add_argument('--train-data-dir', type=str, default='datasets_/train_dataset.csv', help='Path to the train dataset directory')
+    parser.add_argument('--val-data-dir', type=str, default='datasets_/balanced_validation_dataset.csv', help='Path to the val dataset directory')
+    parser.add_argument('--test-data-dir', type=str, default='datasets_/test_dataset.csv', help='Path to the test dataset directory')
+    parser.add_argument('--debug-mode', action='store_true', help='Flag for using small dataset for debug')
     parser.add_argument('--model-name', type=str, default='bert-base-uncased', help='Name of the model to use')
     parser.add_argument('--num-trials', type=int, default=10, help='Number of trials for Optuna')
     parser.add_argument('--use-hierarchical-classifier', action='store_true', help='Flag for hierarchical classification') #--use-hierarchical-classifier --> true
@@ -218,22 +219,26 @@ if __name__ == "__main__":
     parser.add_argument('--max-length', type=int, default=512, help='Maximum length for token number')
     parser.add_argument('--seed', type=int, default=42, help='Seed')
     parser.add_argument('--n-gpu', type=int, default=1, help='Number of GPU')
-    parser.add_argument('--study-name', type=str, default='HC_BERT', help='Optuna study name')
+    parser.add_argument('--study-name', type=str, default='HC_BERT_bc', help='Optuna study name')
     parser.add_argument('--max-evals', type=int, default=500, help='Maximum number of evaluation steps')
-    parser.add_argument('--eval-samples', type=int, default=3200, help='Number of training samples between two evaluations. It should be divisible by 32')
+    parser.add_argument('--eval-samples', type=int, default=4800, help='Number of training samples between two evaluations. It should be divisible by 32')
     parser.add_argument('--output-dir', type=str, default='outputs', help='HPO output directory')
     parser.add_argument('--eval-metric', type=str, default='f1', help='Evaluation metric')
 
     # Parse the command line arguments
     args = parser.parse_args()
-    # if args.use_hierarchical_classifier:
-    #     args.study_name = f"{args.study_name}_{args.loss_weight}"
-    # else:
-    #     args.study_name = f"{args.study_name}_CE"
+    if args.debug_mode:
+        args.study_name = f"{args.study_name}_s"
+        args.train_data_dir = 'datasets_/train_small_data.csv'
+        args.test_data_dir = 'datasets_/test_small_data.csv'
+    if args.use_hierarchical_classifier:
+        args.study_name = f"{args.study_name}_{args.loss_weight}"
+    else:
+        args.study_name = f"{args.study_name}_CE"
     if args.eval_samples%32:
         raise ValueError(f"--eval-samples {args.eval_samples} is not divisible by 32")
 
-    args.study_name = f"{args.study_name}_max_evals{args.max_evals}_eval_samples{args.eval_samples}"
+    args.study_name = f"{args.study_name}_max_evals{args.max_evals}"
     print("MAIN - args",args)
 
     set_seed(args)
