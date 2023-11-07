@@ -8,15 +8,11 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ["WANDB_SILENT"] = "true"
 
 import json
-from transformers import AutoTokenizer, BertTokenizer, BertForSequenceClassification, TrainingArguments, DataCollatorWithPadding
-from transformers import AdamW, get_linear_schedule_with_warmup
-from transformers import BertModel, BertConfig
-# from transformers.trainer_callback import EarlyStoppingCallback
-
+from transformers import TrainingArguments
 import matplotlib.pyplot as plt
 
 from src.trainer import CustomTrainer
-from src.dataset import CodeDataset, split_dataframe
+# from src.dataset import CodeDataset, split_dataframe
 from src.graph import create_graph_from_json, set_uid_to_dimension
 from src.classifier import get_model_and_tokenizer
 from src.callback import EarlyStoppingCallback, WandbCallback, OptunaPruningCallback
@@ -85,7 +81,7 @@ def objective(trial, args):
     model, tokenizer = get_model_and_tokenizer(args, num_labels, prediction_target_uids, graph)
     wandb.watch(model)
 
-    print(model)
+    # print(model)
     # Freeze all parameters of the model
     for param in model.parameters():
         param.requires_grad = False
@@ -93,8 +89,6 @@ def objective(trial, args):
     # Unfreeze the classifier head: to fine-tune only the classifier head
     for param in model.classifier.parameters():
         param.requires_grad = True
-
-    
 
     model.to(device)
 
