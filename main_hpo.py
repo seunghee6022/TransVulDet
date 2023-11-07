@@ -284,8 +284,3 @@ if __name__ == "__main__":
 # --model-name "bert-base-uncased" \
 # --num-trials 10 \
 # --use-hierarchical-classifier 
-
-# deepspeed main_ds.py \
-# --model-name "bert-base-uncased" \
-# --num-trials 1 \
-# --use-hierarchical-classifier 
