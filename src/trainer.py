@@ -1,5 +1,7 @@
 from transformers import Trainer
-from torch.nn import BCEWithLogitsLoss
+from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss
+import torch
+import numpy as np
 
 class CustomTrainer(Trainer):
     '''
@@ -13,19 +15,25 @@ class CustomTrainer(Trainer):
     '''
     def __init__(self, use_hierarchical_classifier, uid_to_dimension, *args, **kwargs): 
         super().__init__( *args, **kwargs)
-        self.loss_fn = BCEWithLogitsLoss()
+        self.loss_fn = CrossEntropyLoss()
         self.use_hierarchical_classifier = use_hierarchical_classifier
         self.uid_to_dimension = uid_to_dimension
         self.num_labels = len(uid_to_dimension)
 
     def one_hot_encode(self, labels):
-        print("labels:",labels)
+        # print("labels:",labels)
         one_hot_encoded = []
         for label in labels:
             one_hot = [0] * self.num_labels
             one_hot[self.uid_to_dimension[label]] = 1
             one_hot_encoded.append(one_hot)  
         return one_hot_encoded
+
+    def mapping_cwe_to_label(self, cwe_label):
+        # Convert each tensor element to its corresponding dictionary value
+        mapped_labels = [self.uid_to_dimension[int(cwe.item())] for cwe in cwe_label]
+        # Convert the list of mapped values back into a tensor
+        return torch.tensor(mapped_labels)
     
     # For multilabel classification, need to define the Custom Loss Function
     def compute_loss(self, model, inputs, return_outputs=False):
@@ -39,22 +47,8 @@ class CustomTrainer(Trainer):
         
         else:
             logits = model(inputs['input_ids'], attention_mask=inputs['attention_mask'])
-            # print("logits.view(-1, num_labels)", logits.shape, logits.view(-1, num_labels).shape,logits.view(-1, num_labels) )
-            loss = self.loss_fn(logits.view(-1, self.num_labels), inputs['labels'].float().view(-1, self.num_labels))
-            
-        # print("logits shape: ", logits.shape)
-        # print("labels shape: ", inputs['labels'].shape)
-        # print("loss:", loss)
+            logits = logits.logits.cpu()
+            labels = self.mapping_cwe_to_label(inputs['labels'].cpu())
+            loss = self.loss_fn(logits, labels)
+
         return (loss, (loss,logits)) if return_outputs else loss
-
-    # def log_metrics(self, metrics, step=None):
-    #     super().log_metrics(metrics, step=step)
-    #     print("INSIDE log_metrics---metrics:",metrics)
-    #     # Add accuracy and F1 score to the logs
-    #     if "accuracy" in metrics:
-    #         self.state.log_history.append({"eval_accuracy": metrics["accuracy"], "step": step})
-    #     if "f1_score" in metrics:
-    #         self.state.log_history.append({"eval_f1_score": metrics["f1_score"], "step": step})
-
-    # def print_model(self):
-    #     print(self.model)
