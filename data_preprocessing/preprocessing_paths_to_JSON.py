@@ -214,13 +214,22 @@ data_str = """
 data_lines = data_str.strip().split("\n")
 new_data_lines = []
 
+wrong_cnt = 0
 for line in data_lines:
     parts = line.split(" - ")
+    parts = [part.strip() for part in parts]
     new_sequences = []
-    for sequence in parts[1].split(", "):
-        if not sequence.startswith("10000-"):
-            sequence = "10000-" + sequence
-        new_sequences.append(sequence)
+    for sequence in parts[1].split(","):
+        seq_list = sequence.split("-")
+        if int(seq_list[-1]) != int(parts[0]):
+            wrong_cnt += 1
+            print(f"Dismatch[{wrong_cnt}/{len(data_lines)}] {seq_list[-1]} != {parts[0]}")
+            print(line)
+        else:
+            if not sequence.startswith("10000-"):
+                sequence_with_root = "10000-" + sequence
+            new_sequences.append(sequence_with_root)
+    # validate the wrong paths - check if the key is in the end of corresponding path
     new_line = parts[0] + " - " + ", ".join(new_sequences)
     new_data_lines.append(new_line)
 
@@ -240,9 +249,9 @@ for line in data_lines:
     else:
         print(f"Skipping line: {line}")
 
-# Save the dictionary as a JSON file
+# # Save the dictionary as a JSON file
 with open('data_preprocessing/preprocessed_datasets/graph_all_paths.json', 'w') as f:
     json.dump(data_dict, f, indent=4)
-
+print("Saved graph_all_paths.json")
 
 
