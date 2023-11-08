@@ -179,11 +179,11 @@ def objective(trial, args):
         # base_params = list(model.bert.parameters()) 
         # Parameters of the classification head
     classifier_params = list(model.classifier.parameters())
-    base_lr = lr
-    classifier_lr = base_lr*classifier_factor
+   
+    base_lr = lr/classifier_factor
+    classifier_lr = lr
 
     optimizer = AdamW([ { "params":  base_params, "lr": base_lr}, {"params": classifier_params, "lr": classifier_lr} ], **adam_kwargs)
-
 
     trainer = CustomTrainer(
         use_hierarchical_classifier = args.use_hierarchical_classifier,
@@ -217,7 +217,7 @@ if __name__ == "__main__":
 
     # Add arguments
     # parser.add_argument('--data-dir', type=str, default='datasets_', help='Path to the dataset directory')
-    parser.add_argument('--node-paths-dir', type=str, default='data_preprocessing/preprocessed_datasets/debug_datasets/graph_final_cwe_paths.json', help='Path to the dataset directory')
+    parser.add_argument('--node-paths-dir', type=str, default='data_preprocessing/preprocessed_datasets/debug_datasets/graph_final_cwe_paths2.json', help='Path to the dataset directory')
     parser.add_argument('--train-data-dir', type=str, default='datasets_/train_dataset.csv', help='Path to the train dataset directory')
     parser.add_argument('--val-data-dir', type=str, default='datasets_/balanced_validation_dataset.csv', help='Path to the val dataset directory')
     parser.add_argument('--test-data-dir', type=str, default='datasets_/test_dataset.csv', help='Path to the test dataset directory')
@@ -233,7 +233,7 @@ if __name__ == "__main__":
     parser.add_argument('--n-gpu', type=int, default=1, help='Number of GPU')
     parser.add_argument('--study-name', type=str, default='HC_BERT', help='Optuna study name')
     parser.add_argument('--max-evals', type=int, default=500, help='Maximum number of evaluation steps')
-    parser.add_argument('--eval-samples', type=int, default=4800, help='Number of training samples between two evaluations. It should be divisible by 32')
+    parser.add_argument('--eval-samples', type=int, default=9600, help='Number of training samples between two evaluations. It should be divisible by 32')
     parser.add_argument('--output-dir', type=str, default='outputs', help='HPO output directory')
     parser.add_argument('--eval-metric', type=str, default='f1', help='Evaluation metric')
 
