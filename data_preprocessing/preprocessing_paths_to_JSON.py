@@ -1,5 +1,5 @@
 import json
-
+import pandas as pd
 # add artifical root to make 0 class validate
 # 0 - 10000-0 
 # 1000 - 10000-1000
@@ -210,6 +210,18 @@ data_str = """
 1336 - 1000-664-913-914-1336 
 """
 
+# Load datasets
+cvefixes = pd.read_csv("data_preprocessing/CVEfixes/CVEfixes_new.csv")
+msr = pd.read_csv("data_preprocessing/Bigvul/MSR.csv")
+cvefixes_cwe_ids = cvefixes['cwe_id'].dropna()
+msr_cwe_ids = msr['cwe_id'].dropna()
+combined_cwe_ids = pd.concat([cvefixes_cwe_ids, msr_cwe_ids])
+
+# Get the unique CWE IDs
+target_cwe_ids = combined_cwe_ids.unique().astype(int).tolist()
+target_cwe_ids = sorted(target_cwe_ids)
+print(type(target_cwe_ids),target_cwe_ids)
+
 # Add new root 10000 to all nodes
 data_lines = data_str.strip().split("\n")
 new_data_lines = []
@@ -218,6 +230,9 @@ wrong_cnt = 0
 for line in data_lines:
     parts = line.split(" - ")
     parts = [part.strip() for part in parts]
+    if int(parts[0]) not in target_cwe_ids:
+        print(f"Skipping {int(parts[0])} as it's not in target_cwe_ids.")
+        continue
     new_sequences = []
     for sequence in parts[1].split(","):
         seq_list = sequence.split("-")
@@ -227,10 +242,11 @@ for line in data_lines:
             print(line)
         else:
             if not sequence.startswith("10000-"):
-                sequence_with_root = "10000-" + sequence
-            new_sequences.append(sequence_with_root)
+                sequence_with_root = "10000-" + sequence.strip()
+            new_sequences.append(sequence_with_root.strip())
     # validate the wrong paths - check if the key is in the end of corresponding path
     new_line = parts[0] + " - " + ", ".join(new_sequences)
+    print("new_line",new_line)
     new_data_lines.append(new_line)
 
 new_data_str = "\n".join(new_data_lines)
@@ -254,4 +270,9 @@ with open('data_preprocessing/preprocessed_datasets/debug_datasets/graph_all_pat
     json.dump(data_dict, f, indent=4)
 print("Saved graph_all_paths.json")
 
-
+# # Load the CWE paths from your JSON (Assuming it's stored in a variable named `cwe_paths_json`)
+# node_paths_dir = 'data_preprocessing/preprocessed_datasets/debug_datasets'
+# with open(f'{node_paths_dir}/graph_final_cwe_paths2.json', 'r') as f:
+#     cwe_paths = json.load(f)
+# print(cwe_paths.keys())
+# print('707' in cwe_paths.keys())
