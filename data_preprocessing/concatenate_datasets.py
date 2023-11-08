@@ -12,18 +12,6 @@ data_path = 'datasets_'
 MSR_df = pd.read_csv('data_preprocessing/Bigvul/MSR.csv')
 CVEfixes_df = pd.read_csv('data_preprocessing/CVEfixes/CVEfixes_new.csv')
 
-# CVEfixes_df_chunk = pd.read_csv('data_preprocessing/CVEfixes/CVEfixes_new.csv', chunksize=1000)
-# print("CVEfixes_df_chunk is ready")
-
-# def read_csv_chunk(chunks):
-#     df_temp = []
-#     for chunk in CVEfixes_df_chunk:
-#         df_temp.append(chunk)
-#     df = pd.concat(df_temp,ignore_index = True)
-#     return df
-
-# CVEfixes_df = read_csv_chunk(CVEfixes_df_chunk)
-
 # List of non-existing CWE IDs
 non_exist_cwe_id_list = [16, 17, 18, 19, 21, 189, 199, 254, 255, 264, 275, 310, 320, 361, 388, 399, 534, 769, 840, 1187]
 print("# CVEfixes_df:",CVEfixes_df.shape)
