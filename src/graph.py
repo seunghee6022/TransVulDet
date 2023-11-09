@@ -46,16 +46,16 @@ def set_uid_to_dimension(graph):
         }
     return uid_to_dimension
 
-def find_hierarchy(paths_dict_data, max_level=None):
-    hierarchy = {}
-    for key, path in paths_dict_data.items():
-        items = path.split('-')
-        if key in items:
-            level = len(items)
-            # If max_level is set, only store nodes with hierarchy level less than or equal to max_level
-            if max_level is None or level <= max_level:
-                hierarchy[int(key)] = level
-    return hierarchy
+# def find_hierarchy(paths_dict_data, max_level=None):
+#     hierarchy = {}
+#     for key, path in paths_dict_data.items():
+#         items = path.split('-')
+#         if key in items:
+#             level = len(items)
+#             # If max_level is set, only store nodes with hierarchy level less than or equal to max_level
+#             if max_level is None or level <= max_level:
+#                 hierarchy[int(key)] = level
+#     return hierarchy
 
 
 def create_graph_from_json(paths_dict_data, max_depth=None):
@@ -93,7 +93,7 @@ def show_tree_graph(graph):
     # print("pos\n",pos)
     pos = {node: (x * scale_factor_x, y * scale_factor_y) for node, (x, y) in pos.items()}
     # print("pos\n",pos)
-    nx.draw(G, pos=pos, with_labels=True, node_size=100, node_color="skyblue",font_size=4, width=1)
+    nx.draw(graph, pos=pos, with_labels=True, node_size=100, node_color="skyblue",font_size=4, width=1)
     # Set the title for the figure
     plt.title("Directed Acyclic Graph for CWE Hierarchy")
     # Save the plot as an image (e.g., PNG, JPEG, PDF)
