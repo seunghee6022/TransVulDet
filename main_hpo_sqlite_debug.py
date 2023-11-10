@@ -11,10 +11,10 @@ import json
 from transformers import TrainingArguments
 import matplotlib.pyplot as plt
 
-from src.trainer import CustomTrainer
+from src.trainer_debug import CustomTrainer
 # from src.dataset import CodeDataset, split_dataframe
 from src.graph import create_graph_from_json, set_uid_to_dimension
-from src.classifier import get_model_and_tokenizer
+from src.classifier_debug import get_model_and_tokenizer
 from src.callback import EarlyStoppingCallback, WandbCallback, OptunaPruningCallback
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, balanced_accuracy_score
 import optuna

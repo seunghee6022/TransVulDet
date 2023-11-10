@@ -240,10 +240,9 @@ if __name__ == "__main__":
     # Parse the command line arguments
     args = parser.parse_args()
     if args.debug_mode:
-        args.study_name = f"{args.study_name}_debug"
-        args.train_data_dir = 'datasets_/2nd_latest_datasets/train_small_data.csv'
-        args.test_data_dir = 'datasets_/2nd_latest_datasets/test_small_data.csv'
-        args.val_data_dir = 'datasets_/2nd_latest_datasets/val_small_data.csv'
+        args.study_name = f"{args.study_name}_s"
+        args.train_data_dir = 'datasets_/train_small_data.csv'
+        args.test_data_dir = 'datasets_/test_small_data.csv'
     if args.use_hierarchical_classifier:
         args.study_name = f"{args.study_name}_{args.loss_weight}"
     else:
