@@ -96,8 +96,8 @@ def objective(trial, args):
     def encode(example):
         # tokenized_inputs = tokenizer(example['code'], truncation=True, padding=True, max_length=args.max_length,return_tensors="pt").to(device)
         tokenized_inputs = tokenizer(example['code'], truncation=True, padding=True, max_length=args.max_length, return_tensors="pt")
-        # tokenized_inputs['labels'] = one_hot_encode(example['cwe_id'])
-        tokenized_inputs['labels'] = example['cwe_id']
+        # tokenized_inputs['labels'] = one_hot_encode(example['assignedclass'])
+        tokenized_inputs['labels'] = example['assignedclass']
         return tokenized_inputs
 
     # Load dataset and make huggingface datasts
