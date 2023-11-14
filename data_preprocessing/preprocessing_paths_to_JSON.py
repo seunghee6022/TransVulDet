@@ -211,11 +211,14 @@ data_str = """
 """
 
 # Load datasets
-cvefixes = pd.read_csv("data_preprocessing/CVEfixes/CVEfixes_new.csv")
-msr = pd.read_csv("data_preprocessing/Bigvul/MSR.csv")
-cvefixes_cwe_ids = cvefixes['cwe_id'].dropna()
-msr_cwe_ids = msr['cwe_id'].dropna()
-combined_cwe_ids = pd.concat([cvefixes_cwe_ids, msr_cwe_ids])
+# cvefixes = pd.read_csv("data_preprocessing/CVEfixes/CVEfixes_new.csv")
+# msr = pd.read_csv("data_preprocessing/Bigvul/MSR.csv")
+# cvefixes_cwe_ids = cvefixes['cwe_id'].dropna()
+# msr_cwe_ids = msr['cwe_id'].dropna()
+# combined_cwe_ids = pd.concat([cvefixes_cwe_ids, msr_cwe_ids])
+combined_df = pd.read_csv("datasets_/combined_dataset.csv")
+print(combined_df)
+combined_cwe_ids = combined_df['assignedclass'].dropna()
 
 # Get the unique CWE IDs
 target_cwe_ids = combined_cwe_ids.unique().astype(int).tolist()
@@ -266,9 +269,9 @@ for line in data_lines:
         print(f"Skipping line: {line}")
 
 # # Save the dictionary as a JSON file
-with open('data_preprocessing/preprocessed_datasets/debug_datasets/graph_all_paths.json', 'w') as f:
+with open('data_preprocessing/preprocessed_datasets/debug_datasets/graph_assignedcwe_paths.json', 'w') as f:
     json.dump(data_dict, f, indent=4)
-print("Saved graph_all_paths.json")
+print("Saved graph_assignedcwe_paths.json")
 
 # # Load the CWE paths from your JSON (Assuming it's stored in a variable named `cwe_paths_json`)
 # node_paths_dir = 'data_preprocessing/preprocessed_datasets/debug_datasets'

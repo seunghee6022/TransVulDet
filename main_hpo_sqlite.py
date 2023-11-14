@@ -187,6 +187,7 @@ def objective(trial, args):
 
     trainer = CustomTrainer(
         use_hierarchical_classifier = args.use_hierarchical_classifier,
+        use_focal_loss = args.use_focal_loss,
         uid_to_dimension = uid_to_dimension,
         model=model,
         args=training_args,
@@ -227,6 +228,7 @@ if __name__ == "__main__":
     parser.add_argument('--use-weight-sampling', action='store_true', help='Flag for using weight sampling')
     parser.add_argument('--use-hierarchical-classifier', action='store_true', help='Flag for hierarchical classification') #--use-hierarchical-classifier --> true
     parser.add_argument('--loss-weight', type=str, default='equalize', help="Loss weight type for Hierarchical classification loss, options: 'default', 'equalize', 'descendants','reachable_leaf_nodes'")
+    parser.add_argument('--use-focal-loss', action='store_true', help='Flag for using focal loss instead of cross entropy loss')
     parser.add_argument('--num-train-epochs', type=int, default=5, help='Number of epoch for training')
     parser.add_argument('--max-length', type=int, default=512, help='Maximum length for token number')
     parser.add_argument('--seed', type=int, default=42, help='Seed')
@@ -247,7 +249,10 @@ if __name__ == "__main__":
     if args.use_hierarchical_classifier:
         args.study_name = f"{args.study_name}_{args.loss_weight}"
     else:
-        args.study_name = f"{args.study_name}_CE"
+        if args.use_focal_loss:
+            args.study_name = f"{args.study_name}_FL"
+        else:
+            args.study_name = f"{args.study_name}_CE"
     if args.eval_samples%32:
         raise ValueError(f"--eval-samples {args.eval_samples} is not divisible by 32")
 

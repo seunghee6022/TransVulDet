@@ -13,9 +13,11 @@ class CustomTrainer(Trainer):
     Or BCEWithLogitsLoss + pos_weight arg  --> Binary classification
     
     '''
-    def __init__(self, use_hierarchical_classifier, uid_to_dimension, *args, **kwargs): 
+    def __init__(self, use_hierarchical_classifier, use_focal_loss, uid_to_dimension, *args, **kwargs): 
         super().__init__( *args, **kwargs)
-        self.loss_fn = CrossEntropyLoss()
+        self.use_focal_loss = use_focal_loss
+        self.loss_fn = CrossEntropyLoss()  if self.use_focal_loss  else FocalLoss(alpha=0.5, gamma=2.0, reduction='mean')
+        # Focal Loss initialization
         self.use_hierarchical_classifier = use_hierarchical_classifier
         self.uid_to_dimension = uid_to_dimension
         self.num_labels = len(uid_to_dimension)

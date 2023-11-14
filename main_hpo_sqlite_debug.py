@@ -219,7 +219,7 @@ if __name__ == "__main__":
     # parser.add_argument('--data-dir', type=str, default='datasets_', help='Path to the dataset directory')
     parser.add_argument('--node-paths-dir', type=str, default='data_preprocessing/preprocessed_datasets/debug_datasets/graph_all_paths.json', help='Path to the dataset directory')
     parser.add_argument('--train-data-dir', type=str, default='datasets_/train_dataset.csv', help='Path to the train dataset directory')
-    parser.add_argument('--val-data-dir', type=str, default='datasets_/balanced_validation_dataset.csv', help='Path to the val dataset directory')
+    parser.add_argument('--val-data-dir', type=str, default='datasets_/validation_dataset.csv', help='Path to the val dataset directory')
     parser.add_argument('--test-data-dir', type=str, default='datasets_/test_dataset.csv', help='Path to the test dataset directory')
     parser.add_argument('--debug-mode', action='store_true', help='Flag for using small dataset for debug')
     parser.add_argument('--model-name', type=str, default='bert-base-uncased', help='Name of the model to use')
