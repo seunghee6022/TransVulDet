@@ -4,40 +4,16 @@ import numpy as np
 import networkx as nx
 
 from transformers import (
-    AutoTokenizer,AutoModel,
-    BertConfig, BertForSequenceClassification,
-    RobertaConfig, RobertaForSequenceClassification,
-    DistilBertConfig, DistilBertForSequenceClassification,
-    T5Config, T5EncoderModel
+    AutoTokenizer,AutoModel,AutoModelForSequenceClassification
 )
-# import other necessary modules and classes
 
 def get_model_and_tokenizer(args, num_labels, prediction_target_uids, graph):
-    # Initialize tokenizer
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-
     if args.use_hierarchical_classifier:
-        # Assuming TransformerWithHierarchicalClassifier is adaptable to work with various models
         model = TransformerWithHierarchicalClassifier(
             args.model_name, prediction_target_uids, graph, args.loss_weight, embedding_dim=num_labels)
     else:
-        # Initialize the model based on the model name
-        if args.model_name == 'bert-base-uncased':
-            config = BertConfig.from_pretrained(args.model_name, num_labels=num_labels)
-            model = BertForSequenceClassification.from_pretrained(args.model_name, config=config)
-        elif args.model_name in ['roberta-base', 'microsoft/coderoberta-base', 'microsoft/codebert-base']:
-            config = RobertaConfig.from_pretrained(args.model_name, num_labels=num_labels)
-            model = RobertaForSequenceClassification.from_pretrained(args.model_name, config=config)
-        elif args.model_name == 'distilbert-base-uncased':
-            config = DistilBertConfig.from_pretrained(args.model_name, num_labels=num_labels)
-            model = DistilBertForSequenceClassification.from_pretrained(args.model_name, config=config)
-        elif args.model_name == 't5-small':
-            # T5 for sequence classification
-            config = T5Config.from_pretrained("t5-small", num_labels=num_labels)
-            model = T5EncoderModel.from_pretrained("t5-small", config=config)
-        else:
-            raise ValueError(f"Model name '{args.model_name}' is not supported or not suitable for sequence classification.")
-
+        model = AutoModelForSequenceClassification.from_pretrained(args.model_name, num_labels=len(prediction_target_uids))
     return model, tokenizer
 
 class TransformerWithHierarchicalClassifier(nn.Module):

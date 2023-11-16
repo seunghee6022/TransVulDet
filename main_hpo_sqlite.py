@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 from src.trainer import CustomTrainer
 # from src.dataset import CodeDataset, split_dataframe
-from src.graph import create_graph_from_json, set_uid_to_dimension
+from src.graph import create_graph_from_json
 from src.classifier import get_model_and_tokenizer
 from src.callback import EarlyStoppingCallback, WandbCallback, OptunaPruningCallback
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, balanced_accuracy_score
@@ -38,16 +38,35 @@ def set_seed(args):
     if args.n_gpu > 0:
         torch.cuda.manual_seed_all(args.seed)
 
-def map_predictions_to_labels(predictions, uid_to_dimension):
+def map_predictions_to_target_labels(predictions, target_to_dimension):
     pred_labels = []
-
     for pred in predictions:
         # Find the index of the max softmax probability
         softmax_idx = np.argmax(pred)
-        uid = list(uid_to_dimension.keys())[softmax_idx]
-        pred_labels.append(uid_to_dimension[uid])
+        cwe_id = list(target_to_dimension.keys())[softmax_idx]
+        if cwe_id not in list(target_to_dimension.keys()):
+            print(f"cwe_id:{cwe_id} is NOT in target_to_dimension!!!!!")
+        cwe_target_idx = target_to_dimension[cwe_id]
+        pred_labels.append(cwe_target_idx)
 
     return pred_labels
+
+def mapping_cwe_to_target_label(cwe_label, target_to_dimension):
+        # Convert each tensor element to its corresponding dictionary value
+        mapped_labels = [target_to_dimension[int(cwe_id)] for cwe_id in cwe_label]
+        return mapped_labels
+
+def get_class_weight(df,target_to_dimension):
+    cwe_list = df['assignedclass'].tolist()
+    idx_classes = [target_to_dimension[int(cwe_id)] for cwe_id in cwe_list]
+    class_counts = np.bincount(idx_classes, minlength=len(target_to_dimension))  # Ensure 'minlength' covers all your classes
+    # Calculate class weights (inverse of the frequency)
+    weights = 1. / class_counts
+    weights = weights / weights.sum()  # Normalize to make the sum of weights equal to 1
+    weights[class_counts == 0] = 0  # Set weight to 0 if class count is 0
+    class_weights = torch.FloatTensor(weights)
+    return class_weights
+
 
 
 # Objective function for Optuna
@@ -72,9 +91,13 @@ def objective(trial, args):
 
     # Define Tokenizer and Model
     num_labels = graph.number_of_nodes() 
-    print("num_labels: ", num_labels)
-    uid_to_dimension = set_uid_to_dimension(graph)
-   
+    target_to_dimension = {target:idx for idx,target in enumerate(prediction_target_uids)}
+    print(f"num_all_nodes:{num_labels} num_target_labels: {len(target_to_dimension)}")
+
+    # define class weights for focal loss
+    df = pd.read_csv('datasets_/combined_dataset.csv')
+    class_weights = get_class_weight(df,target_to_dimension)
+
     # Check if a GPU is available and use it, otherwise, use CPU
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
  
@@ -82,9 +105,9 @@ def objective(trial, args):
     wandb.watch(model)
 
     # print(model)
-    # Freeze all parameters of the model
+    # unfreeze all parameters of the model
     for param in model.parameters():
-        param.requires_grad = False
+        param.requires_grad = True
 
     # Unfreeze the classifier head: to fine-tune only the classifier head
     for param in model.classifier.parameters():
@@ -122,17 +145,21 @@ def objective(trial, args):
         # print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
 
         predictions, labels = p.predictions, p.label_ids
+        labels = mapping_cwe_to_target_label(labels, target_to_dimension)
         
         if args.use_hierarchical_classifier:
             pred_dist = model.deembed_dist(predictions) # get probabilities of each nodes
-            pred_labels = model.dist_to_cwe_ids(pred_dist)
+            pred_cwe_labels = model.dist_to_cwe_ids(pred_dist)
+            pred_labels = mapping_cwe_to_target_label(pred_cwe_labels, target_to_dimension)
         else:
-            pred_labels = map_predictions_to_labels(predictions, uid_to_dimension)
+            # print("predictions", len(predictions), predictions)
+            pred_labels = map_predictions_to_target_labels(predictions, target_to_dimension)
+            # print("")
         predictions = pred_labels
 
-        # print(f"predictions:{len(predictions)}{predictions}")
-        # print(f"labels: {len(labels)}{labels}")
-        precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted', zero_division=0.0, labels=prediction_target_uids)
+        print(f"predictions:{len(predictions)}{predictions}")
+        print(f"labels: {len(labels)}{labels}")
+        precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted', zero_division=0.0, labels=list(target_to_dimension.values()))
         acc = accuracy_score(labels, predictions)
         balanced_acc = balanced_accuracy_score(labels, predictions)
         return {
@@ -188,7 +215,8 @@ def objective(trial, args):
     trainer = CustomTrainer(
         use_hierarchical_classifier = args.use_hierarchical_classifier,
         use_focal_loss = args.use_focal_loss,
-        uid_to_dimension = uid_to_dimension,
+        prediction_target_uids = prediction_target_uids,
+        class_weights = class_weights,
         model=model,
         args=training_args,
         train_dataset=train_dataset,
@@ -218,7 +246,7 @@ if __name__ == "__main__":
 
     # Add arguments
     # parser.add_argument('--data-dir', type=str, default='datasets_', help='Path to the dataset directory')
-    parser.add_argument('--node-paths-dir', type=str, default='data_preprocessing/preprocessed_datasets/debug_datasets/graph_all_paths.json', help='Path to the dataset directory')
+    parser.add_argument('--node-paths-dir', type=str, default='data_preprocessing/preprocessed_datasets/debug_datasets/graph_assignedcwe_paths.json', help='Path to the dataset directory')
     parser.add_argument('--train-data-dir', type=str, default='datasets_/train_dataset.csv', help='Path to the train dataset directory')
     parser.add_argument('--val-data-dir', type=str, default='datasets_/balanced_validation_dataset.csv', help='Path to the val dataset directory')
     parser.add_argument('--test-data-dir', type=str, default='datasets_/test_dataset.csv', help='Path to the test dataset directory')
