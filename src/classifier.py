@@ -132,16 +132,6 @@ class TransformerWithHierarchicalClassifier(nn.Module):
             # head_mask=head_mask,
             # inputs_embeds=inputs_embeds,
         )
-
-        # Original Code
-        # cls_output = outputs[1] # 1: pooler_output --> shape (batch_size:8, hidden_size:768), 0: hidden_states
-        # print("cls_output = outputs[1]", cls_output)
-        # logits = self.classifier(cls_output)
-        # print("logits",logits)
-
-
-        # use the [CLS] token representation as features for hierarchical classifier
-        # print("outputs", outputs)
         # Use the last hidden state
         last_hidden_state = outputs.last_hidden_state  # Shape: (batch_size, sequence_length, hidden_size)
         # print("last_hidden_state", last_hidden_state)
@@ -251,6 +241,7 @@ class TransformerWithHierarchicalClassifier(nn.Module):
         return total_loss
     
     def _deembed_single(self, embedded_label):
+        # print("embedded_label", len(embedded_label), embedded_label)
         conditional_probabilities = {
             uid: embedded_label[i] for uid, i in self.uid_to_dimension.items()
         }
@@ -333,7 +324,8 @@ class HierarchicalClassifier(nn.Module):
         self._l2_regularization_coefficient = 5e-5
        
         # Initialize weights and biases to zero
-        nn.init.zeros_(self.linear.weight) # initialize to 0 --> ask..? with not 0?
+        nn.init.normal_(self.linear.weight, mean=0.0, std=1.0)
+        # nn.init.zeros_(self.linear.weight) # initialize to 0 --> ask..? with not 0?
         nn.init.zeros_(self.linear.bias) 
         
     def forward(self, x):

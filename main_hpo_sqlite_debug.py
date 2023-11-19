@@ -143,23 +143,28 @@ def objective(trial, args):
     print("TRAIN/VAL/TEST SET LENGTHS:",len(train_dataset), len(val_dataset), len(test_dataset))
 
     def compute_metrics(p):
-        # print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
+        print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
 
         predictions, labels = p.predictions, p.label_ids
+        # print("[compute_metrics]p.label_ids before mapping_cwe_to_target_label", p.label_ids)
         labels = mapping_cwe_to_target_label(labels, target_to_dimension)
+        print("[compute_metrics]labels after mapping_cwe_to_target_label[:10]", labels[:10])
         
         if args.use_hierarchical_classifier:
             pred_dist = model.deembed_dist(predictions) # get probabilities of each nodes
+            # print("[if args.use_hierarchical_classifier]pred_dist",pred_dist)
             pred_cwe_labels = model.dist_to_cwe_ids(pred_dist)
+            # print("[if args.use_hierarchical_classifier]pred_cwe_labels",pred_cwe_labels)
             pred_labels = mapping_cwe_to_target_label(pred_cwe_labels, target_to_dimension)
+            print(f"[use_hierarchical_classifier]Unique value: {len(set(pred_labels))} @@@@@@@ pred_labels[:10]:{pred_labels[:10]}")
         else:
             # print("predictions", len(predictions), predictions)
             pred_labels = map_predictions_to_target_labels(predictions, target_to_dimension)
-            # print("")
+            print(f"[Normal Classifiacation]{len(set(pred_labels))} @@@@@@@ pred_labels[:10]:{pred_labels[:10]}")
         predictions = pred_labels
 
-        print(f"predictions:{len(predictions)}{predictions}")
-        print(f"labels: {len(labels)}{labels}")
+        # print(f"predictions:{len(predictions)}{predictions}")
+        # print(f"labels: {len(labels)}{labels}")
         precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted', zero_division=0.0, labels=list(target_to_dimension.values()))
         acc = accuracy_score(labels, predictions)
         balanced_acc = balanced_accuracy_score(labels, predictions)
@@ -199,19 +204,50 @@ def objective(trial, args):
         "betas": (training_args.adam_beta1, training_args.adam_beta2),
         "eps": training_args.adam_epsilon,
     }
-    # Parameters of the base model without the classification head
-    if args.use_hierarchical_classifier:
-        base_params = list(model.model.parameters())
-    else:
-        base_params = [p for n, p in model.named_parameters() if 'classifier' not in n]
-        # base_params = list(model.bert.parameters()) 
-        # Parameters of the classification head
-    classifier_params = list(model.classifier.parameters())
-   
+
     base_lr = lr/classifier_factor
     classifier_lr = lr
 
-    optimizer = AdamW([ { "params":  base_params, "lr": base_lr}, {"params": classifier_params, "lr": classifier_lr} ], **adam_kwargs)
+    classifier_params_names = [n for n, p in model.classifier.named_parameters()] #['dense.weight', 'dense.bias', 'out_proj.weight', 'out_proj.bias']
+    print("classifier_params_names",classifier_params_names)
+    classifier_params = list(model.classifier.parameters())
+    # print("classifier_params", classifier_params)
+    optimizer = AdamW([ {"params": classifier_params, "lr": classifier_lr} ], **adam_kwargs)
+
+
+    if not args.use_tuning_classifier:
+        # Parameters of the base model without the classification head
+        if args.use_tuning_last_layer:
+            pooler_params_names = [n for n, p in model.named_parameters() if 'pooler' in n]
+            base_params_names = [n for n, p in model.named_parameters() if 'encoder.layer.11.output' in n]
+            print("pooler_params Name:\n",pooler_params_names)
+            print("base_params Name:\n",base_params_names)
+            base_params = [p for n, p in model.named_parameters() if 'encoder.layer.11.output' in n]
+            if args.use_hierarchical_classifier:
+                pooler_params = [p for n, p in model.named_parameters() if 'pooler' in n]
+                base_params.append(pooler_params)
+        else:
+            base_params_names = [n for n, p in model.named_parameters() if 'classifier' not in n]
+            print("base_params Name:\n",base_params_names)
+            base_params = [p for n, p in model.named_parameters() if 'classifier' not in n]
+
+        temp_params = []
+        for param in base_params:
+            if type(param) is list:
+                for p in param:
+                    p.requires_grad = True
+                    temp_params.append(p)
+            else:
+                param.requires_grad = True
+                temp_params.append(param)
+        base_params = temp_params
+
+        optimizer = AdamW([ { "params":  base_params, "lr": base_lr}, {"params": classifier_params, "lr": classifier_lr} ], **adam_kwargs)
+
+
+    # for name, param in model.named_parameters():
+    #     if param.requires_grad:
+    #         print(name)
 
     trainer = CustomTrainer(
         use_hierarchical_classifier = args.use_hierarchical_classifier,
@@ -256,9 +292,11 @@ if __name__ == "__main__":
     parser.add_argument('--num-trials', type=int, default=10, help='Number of trials for Optuna')
     parser.add_argument('--use-weight-sampling', action='store_true', help='Flag for using weight sampling')
     parser.add_argument('--use-hierarchical-classifier', action='store_true', help='Flag for hierarchical classification') #--use-hierarchical-classifier --> true
+    parser.add_argument('--use-tuning-last-layer', action='store_true', help='Flag for only fine-tuning pooler layer among base model layers')
+    parser.add_argument('--use-tuning-classifier', action='store_true', help='Flag for only fine-tuning classifier')
     parser.add_argument('--loss-weight', type=str, default='equalize', help="Loss weight type for Hierarchical classification loss, options: 'default', 'equalize', 'descendants','reachable_leaf_nodes'")
     parser.add_argument('--use-focal-loss', action='store_true', help='Flag for using focal loss instead of cross entropy loss')
-    parser.add_argument('--num-train-epochs', type=int, default=5, help='Number of epoch for training')
+    # parser.add_argument('--num-train-epochs', type=int, default=5, help='Number of epoch for training')
     parser.add_argument('--max-length', type=int, default=512, help='Maximum length for token number')
     parser.add_argument('--seed', type=int, default=42, help='Seed')
     parser.add_argument('--n-gpu', type=int, default=1, help='Number of GPU')
@@ -275,6 +313,13 @@ if __name__ == "__main__":
         args.train_data_dir = 'datasets_/2nd_latest_datasets/train_small_data.csv'
         args.test_data_dir = 'datasets_/2nd_latest_datasets/test_small_data.csv'
         args.val_data_dir = 'datasets_/2nd_latest_datasets/val_small_data.csv'
+
+    if not args.use_tuning_classifier:
+        if args.use_tuning_last_layer:
+            args.study_name = f"{args.study_name}_ll"
+    else:
+        args.study_name = f"{args.study_name}_cls"
+
     if args.use_hierarchical_classifier:
         args.study_name = f"{args.study_name}_{args.loss_weight}"
     else:
@@ -282,6 +327,8 @@ if __name__ == "__main__":
             args.study_name = f"{args.study_name}_FL"
         else:
             args.study_name = f"{args.study_name}_CE"
+
+
     if args.eval_samples%32:
         raise ValueError(f"--eval-samples {args.eval_samples} is not divisible by 32")
 

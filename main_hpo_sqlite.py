@@ -48,13 +48,12 @@ def map_predictions_to_target_labels(predictions, target_to_dimension):
             print(f"cwe_id:{cwe_id} is NOT in target_to_dimension!!!!!")
         cwe_target_idx = target_to_dimension[cwe_id]
         pred_labels.append(cwe_target_idx)
-
     return pred_labels
 
 def mapping_cwe_to_target_label(cwe_label, target_to_dimension):
-        # Convert each tensor element to its corresponding dictionary value
-        mapped_labels = [target_to_dimension[int(cwe_id)] for cwe_id in cwe_label]
-        return mapped_labels
+    # Convert each tensor element to its corresponding dictionary value
+    mapped_labels = [target_to_dimension[int(cwe_id)] for cwe_id in cwe_label]
+    return mapped_labels
 
 def get_class_weight(df,target_to_dimension):
     cwe_list = df['assignedclass'].tolist()
@@ -102,6 +101,7 @@ def objective(trial, args):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
  
     model, tokenizer = get_model_and_tokenizer(args, num_labels, prediction_target_uids, graph)
+    # print(model)
     wandb.watch(model)
 
     # print(model)
@@ -145,6 +145,7 @@ def objective(trial, args):
         # print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
 
         predictions, labels = p.predictions, p.label_ids
+        print(f"Initial predictions:{len(predictions)}{predictions}")
         labels = mapping_cwe_to_target_label(labels, target_to_dimension)
         
         if args.use_hierarchical_classifier:
@@ -199,12 +200,35 @@ def objective(trial, args):
         "eps": training_args.adam_epsilon,
     }
     # Parameters of the base model without the classification head
-    if args.use_hierarchical_classifier:
-        base_params = list(model.model.parameters())
+    '''
+    To avoid catastropic forgetting --> maybe only fine-tuning RobertaPooler?
+    (pooler): RobertaPooler(
+      (dense): Linear(in_features=768, out_features=768, bias=True)
+      (activation): Tanh()
+    '''
+    # if args.use_hierarchical_classifier:
+    #     base_params = [p for n, p in model.named_parameters() if 'classifier' not in n]
+    #     # base_params = [p for n, p in model.named_parameters() if 'roberta.pooler' in n]
+
+    # else:
+    #     base_params = list(model.model.parameters())
+    
+    if args.use_tuning_last_layer:
+        if args.use_hierarchical_classifier:
+            pooler_params = [n for n, p in model.named_parameters() if 'roberta.pooler' in n]
+            base_params = [n for n, p in model.named_parameters() if 'roberta.encoder.layer.11.output' in n]
+            base_params.append(pooler_params)
+            print("base_params Name:\n",base_params)
+            pooler_params = [p for n, p in model.named_parameters() if 'roberta.pooler' in n]
+            base_params = [p for n, p in model.named_parameters() if 'roberta.encoder.layer.11.output' in n]
+            base_params.append(pooler_params)
     else:
+        base_params = [n for n, p in model.named_parameters() if 'roberta.encoder.layer.11.output' in n]
+        print("base_params Name:\n",base_params)
         base_params = [p for n, p in model.named_parameters() if 'classifier' not in n]
-        # base_params = list(model.bert.parameters()) 
-        # Parameters of the classification head
+    
+    classifier_params = [n for n, p in model.classifier.named_parameters()]
+    print("classifier_params",classifier_params)
     classifier_params = list(model.classifier.parameters())
    
     base_lr = lr/classifier_factor
@@ -255,6 +279,7 @@ if __name__ == "__main__":
     parser.add_argument('--num-trials', type=int, default=10, help='Number of trials for Optuna')
     parser.add_argument('--use-weight-sampling', action='store_true', help='Flag for using weight sampling')
     parser.add_argument('--use-hierarchical-classifier', action='store_true', help='Flag for hierarchical classification') #--use-hierarchical-classifier --> true
+    parser.add_argument('--use-tuning-last-layer', action='store_true', help='Flag for only fine-tuning pooler layer')
     parser.add_argument('--loss-weight', type=str, default='equalize', help="Loss weight type for Hierarchical classification loss, options: 'default', 'equalize', 'descendants','reachable_leaf_nodes'")
     parser.add_argument('--use-focal-loss', action='store_true', help='Flag for using focal loss instead of cross entropy loss')
     parser.add_argument('--num-train-epochs', type=int, default=5, help='Number of epoch for training')
@@ -281,6 +306,9 @@ if __name__ == "__main__":
             args.study_name = f"{args.study_name}_FL"
         else:
             args.study_name = f"{args.study_name}_CE"
+    if args.use_tuning_last_layer:
+        args.study_name = f"{args.study_name}_ll"
+
     if args.eval_samples%32:
         raise ValueError(f"--eval-samples {args.eval_samples} is not divisible by 32")
 
