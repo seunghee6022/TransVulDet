@@ -44,7 +44,9 @@ def map_predictions_to_target_labels(predictions, target_to_dimension):
     for pred in predictions:
         # Find the index of the max softmax probability
         softmax_idx = np.argmax(pred)
+        print(softmax_idx)
         cwe_id = list(target_to_dimension.keys())[softmax_idx]
+        # print("softmax_idx:",softmax_idx, "pred:",pred, "cwe_id",cwe_id)
         if cwe_id not in list(target_to_dimension.keys()):
             print(f"cwe_id:{cwe_id} is NOT in target_to_dimension!!!!!")
         cwe_target_idx = target_to_dimension[cwe_id]
@@ -72,11 +74,12 @@ def get_class_weight(df,target_to_dimension):
 def objective(trial, args):
 
     # Suggest hyperparameters
-    lr = trial.suggest_float("learning_rate", 1e-6, 1e-1, log=True)
+    lr = trial.suggest_float("learning_rate", 1e-4, 1e-1, log=True)
+    base_lr = trial.suggest_float("base_learning_rate", 1e-8, 1e-6, log=True)
     weight_decay = trial.suggest_float("weight_decay", 1e-7, 1e-2, log=True)
     # per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
     per_device_train_batch_size = trial.suggest_categorical("per_device_train_batch_size", [4, 8, 16, 32])
-    classifier_factor = trial.suggest_float("classifier_factor",1, 100, log=True)
+    weight_factor = trial.suggest_float("weight_factor",1e-3, 5, log=True)
     # loss_weight = trial.suggest_categorical('loss_weight_method', ['default', 'eqaulize', 'descendants','reachable_leaf_nodes'])
     
     # args.loss_weight = loss_weight # should remove
@@ -103,7 +106,7 @@ def objective(trial, args):
     # Check if a GPU is available and use it, otherwise, use CPU
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
  
-    model, tokenizer = get_model_and_tokenizer(args, num_labels, prediction_target_uids, graph)
+    model, tokenizer = get_model_and_tokenizer(args, num_labels, prediction_target_uids, weight_factor, graph)
     wandb.watch(model)
 
     # print(model)
@@ -204,7 +207,7 @@ def objective(trial, args):
         "eps": training_args.adam_epsilon,
     }
 
-    base_lr = lr/classifier_factor
+    # base_lr = lr/classifier_factor
     classifier_lr = lr
 
     '''
@@ -316,8 +319,8 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=42, help='Seed')
     parser.add_argument('--n-gpu', type=int, default=1, help='Number of GPU')
     parser.add_argument('--study-name', type=str, default='HC_BERT', help='Optuna study name')
-    parser.add_argument('--max-evals', type=int, default=500, help='Maximum number of evaluation steps')
-    parser.add_argument('--eval-samples', type=int, default=96000, help='Number of training samples between two evaluations. It should be divisible by 32')
+    parser.add_argument('--max-evals', type=int, default=100, help='Maximum number of evaluation steps')
+    parser.add_argument('--eval-samples', type=int, default=40000, help='Number of training samples between two evaluations. It should be divisible by 32')
     parser.add_argument('--output-dir', type=str, default='outputs', help='HPO output directory')
     parser.add_argument('--eval-metric', type=str, default='f1', help='Evaluation metric')
 
