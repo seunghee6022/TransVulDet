@@ -74,7 +74,8 @@ def objective(trial, args):
     # Suggest hyperparameters
     lr = trial.suggest_float("learning_rate", 1e-6, 1e-1, log=True)
     weight_decay = trial.suggest_float("weight_decay", 1e-7, 1e-2, log=True)
-    per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
+    # per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
+    per_device_train_batch_size = trial.suggest_categorical("per_device_train_batch_size", [4, 8, 16, 32])
     classifier_factor = trial.suggest_float("classifier_factor",1, 100, log=True)
     # loss_weight = trial.suggest_categorical('loss_weight_method', ['default', 'eqaulize', 'descendants','reachable_leaf_nodes'])
     
@@ -165,7 +166,7 @@ def objective(trial, args):
 
         # print(f"predictions:{len(predictions)}{predictions}")
         # print(f"labels: {len(labels)}{labels}")
-        precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted', zero_division=0.0, labels=list(target_to_dimension.values()))
+        precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='macro', zero_division=0.0, labels=list(target_to_dimension.values()))
         acc = accuracy_score(labels, predictions)
         balanced_acc = balanced_accuracy_score(labels, predictions)
         return {
@@ -176,14 +177,12 @@ def objective(trial, args):
             'recall': recall
         }
 
-  
-    # data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
     eval_steps = int(round(args.eval_samples/per_device_train_batch_size, -1))
 
     training_args = TrainingArguments(
         per_device_train_batch_size=per_device_train_batch_size,
-        per_device_eval_batch_size=per_device_train_batch_size,
+        per_device_eval_batch_size=32,
         max_steps=eval_steps*args.max_evals,
         weight_decay=weight_decay,
         logging_dir='./logs',
@@ -208,28 +207,44 @@ def objective(trial, args):
     base_lr = lr/classifier_factor
     classifier_lr = lr
 
+    '''
+    1. classifier
+    2. pre-trained model + classifier
+    3. last encoder output layer + classifier
+
+    HC --> custom classifier
+
+    12th output layer
+    pooler
+    classifier
+
+    classification model
+    12th output layer
+    default classifier
+
+    '''
+
     classifier_params_names = [n for n, p in model.classifier.named_parameters()] #['dense.weight', 'dense.bias', 'out_proj.weight', 'out_proj.bias']
     print("classifier_params_names",classifier_params_names)
     classifier_params = list(model.classifier.parameters())
     # print("classifier_params", classifier_params)
     optimizer = AdamW([ {"params": classifier_params, "lr": classifier_lr} ], **adam_kwargs)
 
-
-    if not args.use_tuning_classifier:
+    if not args.use_tuning_classifier: # only classifier
         # Parameters of the base model without the classification head
-        if args.use_tuning_last_layer:
+        if args.use_tuning_last_layer: # last layer + classifier
             pooler_params_names = [n for n, p in model.named_parameters() if 'pooler' in n]
             base_params_names = [n for n, p in model.named_parameters() if 'encoder.layer.11.output' in n]
             print("pooler_params Name:\n",pooler_params_names)
             print("base_params Name:\n",base_params_names)
-            base_params = [p for n, p in model.named_parameters() if 'encoder.layer.11.output' in n]
+            base_params = [p for n, p in model.named_parameters() if 'encoder.layer.11.output' in n] # last layer
             if args.use_hierarchical_classifier:
                 pooler_params = [p for n, p in model.named_parameters() if 'pooler' in n]
                 base_params.append(pooler_params)
-        else:
+        else: # whole pre-trained model layers
             base_params_names = [n for n, p in model.named_parameters() if 'classifier' not in n]
             print("base_params Name:\n",base_params_names)
-            base_params = [p for n, p in model.named_parameters() if 'classifier' not in n]
+            base_params = [p for n, p in model.named_parameters() if 'classifier' not in n] 
 
         temp_params = []
         for param in base_params:
@@ -302,7 +317,7 @@ if __name__ == "__main__":
     parser.add_argument('--n-gpu', type=int, default=1, help='Number of GPU')
     parser.add_argument('--study-name', type=str, default='HC_BERT', help='Optuna study name')
     parser.add_argument('--max-evals', type=int, default=500, help='Maximum number of evaluation steps')
-    parser.add_argument('--eval-samples', type=int, default=9600, help='Number of training samples between two evaluations. It should be divisible by 32')
+    parser.add_argument('--eval-samples', type=int, default=96000, help='Number of training samples between two evaluations. It should be divisible by 32')
     parser.add_argument('--output-dir', type=str, default='outputs', help='HPO output directory')
     parser.add_argument('--eval-metric', type=str, default='f1', help='Evaluation metric')
 
