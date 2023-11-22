@@ -13,11 +13,11 @@ class EarlyStoppingCallback(TrainerCallback):
     def on_evaluate(self, args: TrainingArguments, state: TrainerState, control:TrainerControl, logs=None, **kwargs):
         eval_loss = state.log_history[-1]['eval_loss']
         score = -eval_loss
-        print("INSIDE early stopping!!")
+        # print("INSIDE early stopping!!")
         if self.best_score is None:
             self.best_score = score
-            print("self.best_score:",-self.best_score)
-        elif score < self.best_score + self.threshold:
+            # print("self.best_score:",-self.best_score)
+        elif score - self.best_score < self.threshold:
             self.counter += 1
             print("self.counter:",self.counter)
             if self.counter >= self.patience:
@@ -51,7 +51,7 @@ class OptunaPruningCallback(TrainerCallback):
         #     return
         
         metrics = state.log_history[-1].get(self.metric_for_best_model, None)
-        print(f"metric log_history:{metrics}")
+        # print(f"metric log_history:{metrics}")
         
         # Report intermediate value to optuna
         if metrics is not None:

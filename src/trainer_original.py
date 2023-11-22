@@ -23,6 +23,17 @@ class CustomTrainer(Trainer):
         self.use_focal_loss = use_focal_loss
         self.target_to_dimension = {target:idx for idx,target in enumerate(self.prediction_target_uids)}
         self.class_weights = class_weights
+        # self.uid_to_dimension = uid_to_dimension
+        # self.num_labels = len(uid_to_dimension)
+
+    # def one_hot_encode(self, labels):
+    #     # print("labels:",labels)
+    #     one_hot_encoded = []
+    #     for label in labels:
+    #         one_hot = [0] * self.num_labels
+    #         one_hot[self.uid_to_dimension[label]] = 1
+    #         one_hot_encoded.append(one_hot)  
+    #     return one_hot_encoded
 
     def mapping_cwe_to_label(self, cwe_label):
         # Convert each tensor element to its corresponding dictionary value
@@ -35,6 +46,9 @@ class CustomTrainer(Trainer):
         if self.use_hierarchical_classifier:
             # loss, logits = model(inputs['input_ids'], attention_mask=inputs['attention_mask'], labels=inputs['labels'])
             logits = model(inputs['input_ids'], attention_mask=inputs['attention_mask'])
+            # print("logits",logits)
+            logits = F.softmax(logits, dim=-1)  # ----> remove??????
+            # print("logits",logits)
             loss = model.loss(logits, inputs['labels'])
             # print("logits, inputs['labels']", logits.shape,  inputs['labels'].shape)
         
@@ -50,6 +64,8 @@ class CustomTrainer(Trainer):
                 gamma = 2.0
                 self.loss_fn = FocalLoss(gamma=gamma, weights=self.class_weights.cpu()) #https://pypi.org/project/focal-loss-torch/
                 loss = self.loss_fn(logits, labels)
+         
+
             else:
                 loss = self.loss_fn(logits, labels)
 

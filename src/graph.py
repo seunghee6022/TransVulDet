@@ -80,24 +80,28 @@ def create_graph_from_json(paths_dict_data, max_depth=None):
     return G
 
 
-def show_tree_graph(graph):
- 
-    plt.figure(figsize=(30, 8))
-    plt.tight_layout(pad=1.0)
-    # plt.ylim(0, 5)  # Adjust as needed
+def save_tree_graph_png(paths_file, fig_title, file_name, figsize=(20, 10), node_size=2000, font_size=20, width=5):
+    with open(paths_file, 'r') as f:
+        paths_dict_data = json.load(f)
+    
+    max_depth = None
+    graph = create_graph_from_json(paths_dict_data, max_depth)
 
-    # Assuming pos has your node positions
-    scale_factor_x = 1.2  # adjust as needed
-    scale_factor_y = 0.8
+    plt.figure(figsize=figsize)
     pos = graphviz_layout(graph, prog='dot')  # Use the Graphviz layout
     # print("pos\n",pos)
-    pos = {node: (x * scale_factor_x, y * scale_factor_y) for node, (x, y) in pos.items()}
+    # pos = {node: (x * scale_factor_x, y * scale_factor_y) for node, (x, y) in pos.items()}
     # print("pos\n",pos)
-    nx.draw(graph, pos=pos, with_labels=True, node_size=100, node_color="skyblue",font_size=4, width=1)
+    # nx.draw(graph, pos=pos, with_labels=True, node_size=700, node_color="skyblue",font_size=10, width=2)
+    nx.draw(graph, pos=pos, with_labels=True, node_size=node_size, node_color="skyblue",font_size=font_size, width=width)
     # Set the title for the figure
-    plt.title("Directed Acyclic Graph for CWE Hierarchy")
+    # plt.title("Directed Acyclic Graph for CWE Hierarchy after CWE Reassignment")
+    # plt.title("Directed Acyclic Graph for Original CWE Hierarchy")
+    plt.title(fig_title)
     # Save the plot as an image (e.g., PNG, JPEG, PDF)
-    plt.savefig("figures/Assignedcwe_DAG.png")
+    # plt.savefig("figures/original_DAG.png")
+    plt.savefig(f"figures/{file_name}.png")
+   
 
     plt.show()
 
@@ -109,15 +113,27 @@ if __name__ == "__main__":
     # node_path_dir='datasets_/graph_all_paths.json'
     # validate_all_nodes_in_total_cwe_id_list(total_cwe_id_list_dir, node_path_dir)
     # Create graph from JSON
+    # paths_file = 'data_preprocessing/preprocessed_datasets/debug_datasets/graph_original_paths.json'
     # paths_file = 'data_preprocessing/preprocessed_datasets/debug_datasets/graph_all_paths.json'
     paths_file = 'data_preprocessing/preprocessed_datasets/debug_datasets/graph_assignedcwe_paths.json'
-    with open(paths_file, 'r') as f:
-        paths_dict_data = json.load(f)
+    fig_title = "Directed Acyclic Graph for CWE Hierarchy after CWE Reassignment"
+    file_name = "reassigned_cwe_DAG"
+    save_tree_graph_png(paths_file=paths_file, fig_title=fig_title, file_name=file_name, figsize=(20, 10), node_size=2000, font_size=20, width=5)
+
+    paths_file = 'data_preprocessing/preprocessed_datasets/debug_datasets/graph_assignedcwe_paths_new.json'
+    fig_title = "Directed Acyclic Graph for CWE Hierarchy after CWE Reassignment"
+    file_name = "reassigned_cwe_DAG_new"
+    save_tree_graph_png(paths_file=paths_file, fig_title=fig_title, file_name=file_name, figsize=(20, 10), node_size=2000, font_size=20, width=5)
+
+    paths_file = 'data_preprocessing/preprocessed_datasets/debug_datasets/graph_original_paths.json'
+    fig_title = "Directed Acyclic Graph for Original CWE Hierarchy (w/o Artificial Root)"
+    file_name = "original_DAG_"
+    save_tree_graph_png(paths_file=paths_file, fig_title=fig_title, file_name=file_name, figsize=(30, 10), node_size=700, font_size=10, width=2)
     
-    max_depth = None
-    G = create_graph_from_json(paths_dict_data, max_depth)
-    # Draw the graph in a tree style
-    show_tree_graph(G)
+    paths_file = 'data_preprocessing/preprocessed_datasets/debug_datasets/graph_all_paths.json'
+    fig_title = "Directed Acyclic Graph for CWE Hierarchy (w Artificial Root)"
+    file_name = "DAG_"
+    save_tree_graph_png(paths_file=paths_file, fig_title=fig_title, file_name=file_name, figsize=(30, 10), node_size=700, font_size=10, width=2)
 
 #     # Example of using the classifier
 #     input_dim = 10

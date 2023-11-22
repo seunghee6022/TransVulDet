@@ -218,14 +218,14 @@ data_str = """
 # msr_cwe_ids = msr['cwe_id'].dropna()
 # combined_cwe_ids = pd.concat([cvefixes_cwe_ids, msr_cwe_ids])
 
-def preprocess_and_save_path_to_json(df, col_name, file_name):
+def preprocess_and_save_path_to_json(df, add_root, col_name, file_name):
  
     combined_cwe_ids = df[col_name].dropna()
 
     # Get the unique CWE IDs
     target_cwe_ids = combined_cwe_ids.unique().astype(int).tolist()
     target_cwe_ids = sorted(target_cwe_ids)
-    print(type(target_cwe_ids),target_cwe_ids)
+    print("target_cwe_ids:",type(target_cwe_ids),target_cwe_ids)
 
     # Add new root 10000 to all nodes
     data_lines = data_str.strip().split("\n")
@@ -236,8 +236,10 @@ def preprocess_and_save_path_to_json(df, col_name, file_name):
         parts = line.split(" - ")
         parts = [part.strip() for part in parts]
         if int(parts[0]) not in target_cwe_ids:
-            print(f"Skipping {int(parts[0])} as it's not in target_cwe_ids.")
+            # print(f"Skipping {int(parts[0])} as it's not in target_cwe_ids.")
             continue
+        else:
+           print(f"{int(parts[0])} it's in target_cwe_ids.{parts}") 
         new_sequences = []
         for sequence in parts[1].split(","):
             seq_list = sequence.split("-")
@@ -246,14 +248,17 @@ def preprocess_and_save_path_to_json(df, col_name, file_name):
                 print(f"Dismatch[{wrong_cnt}/{len(data_lines)}] {seq_list[-1]} != {parts[0]}")
                 print(line)
             else:
-                if not sequence.startswith("10000-"):
-                    sequence_with_root = "10000-" + sequence.strip()
-                new_sequences.append(sequence_with_root.strip())
+                if add_root:
+                    if not sequence.startswith("10000-"):
+                        sequence_with_root = "10000-" + sequence.strip()
+                    new_sequences.append(sequence_with_root.strip())
+                else:
+                    new_sequences.append(sequence.strip())
         # validate the wrong paths - check if the key is in the end of corresponding path
         new_line = parts[0] + " - " + ", ".join(new_sequences)
-        print("new_line",new_line)
         new_data_lines.append(new_line)
 
+    # print(f"new_data_lines {len(new_data_lines), new_data_lines}")
     new_data_str = "\n".join(new_data_lines)
 
     # Save it as json file
@@ -263,13 +268,14 @@ def preprocess_and_save_path_to_json(df, col_name, file_name):
     for line in data_lines:
         if ' - ' in line:  # Check if the separator exists in the line
             key, value = line.split(' - ')
+            print(key, value)
             # if ', ' in value:
             #     continue
             # data_dict[key] = value
             data_dict[key] = value.split(', ')
         else:
             print(f"Skipping line: {line}")
-
+    print(len(data_dict), data_dict)
     # # Save the dictionary as a JSON file
     with open(f'data_preprocessing/preprocessed_datasets/debug_datasets/{file_name}.json', 'w') as f:
         json.dump(data_dict, f, indent=4)
@@ -280,10 +286,14 @@ def preprocess_and_save_path_to_json(df, col_name, file_name):
 cvefixes = pd.read_csv("data_preprocessing/CVEfixes/CVEfixes_new.csv")
 msr = pd.read_csv("data_preprocessing/Bigvul/MSR.csv")
 combined_df = pd.concat([cvefixes, msr])
-print(combined_df)
-preprocess_and_save_path_to_json(combined_df, col_name='cwe_id', file_name='graph_all_paths')
+print(combined_df.nunique())
+# The original CWE hierarchy doesn't contain 0 and 10000(new root) class
+original_cwe_df = combined_df[combined_df['cwe_id'] != 0]
+# preprocess_and_save_path_to_json(original_cwe_df, add_root=False, col_name='cwe_id', file_name='graph_original_paths')
 
-
+# preprocess_and_save_path_to_json(combined_df, add_root=True, col_name='cwe_id', file_name='graph_all_paths')
 combined_df = pd.read_csv("datasets_/combined_dataset.csv")
+print(combined_df.nunique())
 print(combined_df)
-preprocess_and_save_path_to_json(combined_df, col_name='assignedclass', file_name='graph_assignedcwe_paths')
+preprocess_and_save_path_to_json(combined_df, add_root=True, col_name='cwe_id', file_name='graph_assignedcwe_paths_new')
+preprocess_and_save_path_to_json(combined_df, add_root=True, col_name='assignedclass', file_name='graph_assignedcwe_paths')

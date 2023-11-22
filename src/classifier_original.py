@@ -138,7 +138,7 @@ class TransformerWithHierarchicalClassifier(nn.Module):
         cls_output = last_hidden_state[:, 0, :]  # Take the representation of [CLS] token - [batch_size, tokens, hidden_dim] CLS token is the first token of last hidden state
         # print("cls_output = last_hidden_state[:, 0, :] ", cls_output)
         logits = self.classifier(cls_output)
-        # print("[forward] logits", logits)
+        print("[forward] logits", logits)
         
         if labels is not None:
             loss = self.loss(logits, labels)

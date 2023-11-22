@@ -74,15 +74,16 @@ def get_class_weight(df,target_to_dimension):
     return class_weights
 
 # Objective function for Optuna
-def objective(trial, args):
+def main(args):
 
     # Suggest hyperparameters
-    lr = trial.suggest_float("classifier_learning_rate", 1e-5, 1e-1, log=True)
-    classifier_factor = trial.suggest_float("classifier_factor", 1e1, 1e5, log=True)
-    weight_decay = trial.suggest_float("weight_decay", 1e-7, 1e-2, log=True)
-    gradient_accumulation_steps = trial.suggest_int("gradient_accumulation_steps", 1, 32, log=True)
+    lr = 2.0888044755611805e-05
+    # classifier_factor = trial.suggest_float("classifier_factor", 1e1, 1e5, log=True)
+    base_lr = 9.196181901639523e-06
+    weight_decay = 0.00737895178626443
     weight_factor = 1
     per_device_train_batch_size = 32
+    
 
     # Create graph from JSON
     with open(args.node_paths_dir, 'r') as f:
@@ -112,39 +113,13 @@ def objective(trial, args):
     # print(model)
     # Freeze all parameters of the model
     for param in model.parameters():
-        param.requires_grad = False
+        param.requires_grad = True
 
     # Unfreeze the classifier head: to fine-tune only the classifier head
     for param in model.classifier.parameters():
         param.requires_grad = True
 
     model.to(device)
-
-    # Function to tokenize on the fly
-    def encode(example):
-        # tokenized_inputs = tokenizer(example['code'], truncation=True, padding=True, max_length=args.max_length,return_tensors="pt").to(device)
-        tokenized_inputs = tokenizer(example['code'], truncation=True, padding=True, max_length=args.max_length, return_tensors="pt")
-        # tokenized_inputs['labels'] = one_hot_encode(example['assignedclass'])
-        tokenized_inputs['labels'] = example['assignedclass']
-        return tokenized_inputs
-
-    # Load dataset and make huggingface datasts
-  
-    data_files = {
-        'train': f'{args.train_data_dir}',
-        'validation': f'{args.val_data_dir}',
-        'test': f'{args.test_data_dir}',
-        }
-    
-    dataset = load_dataset('csv', data_files=data_files)
-    # Set the transform function for on-the-fly tokenization
-    dataset.set_transform(encode)
-
-    train_dataset = dataset['train']
-    val_dataset = dataset['validation']
-    test_dataset = dataset['test']
-
-    print("TRAIN/VAL/TEST SET LENGTHS:",len(train_dataset), len(val_dataset), len(test_dataset))
 
     def compute_metrics(p):
         print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
@@ -209,13 +184,14 @@ def objective(trial, args):
         metric_for_best_model = args.eval_metric,
         greater_is_better = True,
     )
+   
 
     adam_kwargs = {
         "betas": (training_args.adam_beta1, training_args.adam_beta2),
         "eps": training_args.adam_epsilon,
     }
 
-    base_lr = lr/classifier_factor
+    # base_lr = lr/classifier_factor
     classifier_lr = lr
 
     '''
@@ -235,40 +211,10 @@ def objective(trial, args):
 
     '''
 
-    classifier_params_names = [n for n, p in model.classifier.named_parameters()] #['dense.weight', 'dense.bias', 'out_proj.weight', 'out_proj.bias']
-    # print("classifier_params_names",classifier_params_names)
     classifier_params = list(model.classifier.parameters())
-    # print("classifier_params", classifier_params)
-    optimizer = AdamW([ {"params": classifier_params, "lr": classifier_lr} ], **adam_kwargs)
+    base_params = [p for n, p in model.named_parameters() if 'classifier' not in n] 
 
-    if not args.use_tuning_classifier: # only classifier
-        # Parameters of the base model without the classification head
-        if args.use_tuning_last_layer: # last layer + classifier
-            pooler_params_names = [n for n, p in model.named_parameters() if 'pooler' in n]
-            base_params_names = [n for n, p in model.named_parameters() if 'encoder.layer.11.output' in n]
-            # print("pooler_params Name:\n",pooler_params_names)
-            # print("base_params Name:\n",base_params_names)
-            base_params = [p for n, p in model.named_parameters() if 'encoder.layer.11.output' in n] # last layer
-            if args.use_hierarchical_classifier:
-                pooler_params = [p for n, p in model.named_parameters() if 'pooler' in n]
-                base_params.append(pooler_params)
-        else: # whole pre-trained model layers
-            base_params_names = [n for n, p in model.named_parameters() if 'classifier' not in n]
-            # print("base_params Name:\n",base_params_names)
-            base_params = [p for n, p in model.named_parameters() if 'classifier' not in n] 
-
-        temp_params = []
-        for param in base_params:
-            if type(param) is list:
-                for p in param:
-                    p.requires_grad = True
-                    temp_params.append(p)
-            else:
-                param.requires_grad = True
-                temp_params.append(param)
-        base_params = temp_params
-
-        optimizer = AdamW([ { "params":  base_params, "lr": base_lr}, {"params": classifier_params, "lr": classifier_lr} ], **adam_kwargs)
+    optimizer = AdamW([ { "params":  base_params, "lr": base_lr}, {"params": classifier_params, "lr": classifier_lr} ], **adam_kwargs)
 
     trainer = CustomTrainer(
         use_hierarchical_classifier = args.use_hierarchical_classifier,
@@ -293,8 +239,6 @@ def objective(trial, args):
     wandb.log(metrics)
     print("metrics:",metrics)
 
-    return metrics[f"eval_{args.eval_metric}"]
-    
 
 if __name__ == "__main__":
     torch.cuda.empty_cache()
@@ -310,7 +254,7 @@ if __name__ == "__main__":
     parser.add_argument('--test-data-dir', type=str, default='datasets_/test_dataset.csv', help='Path to the test dataset directory')
     parser.add_argument('--debug-mode', action='store_true', help='Flag for using small dataset for debug')
     parser.add_argument('--model-name', type=str, default='bert-base-uncased', help='Name of the model to use')
-    parser.add_argument('--num-trials', type=int, default=1, help='Number of trials for Optuna')
+    parser.add_argument('--num-trials', type=int, default=10, help='Number of trials for Optuna')
     parser.add_argument('--use-weight-sampling', action='store_true', help='Flag for using weight sampling')
     parser.add_argument('--use-hierarchical-classifier', action='store_true', help='Flag for hierarchical classification') #--use-hierarchical-classifier --> true
     parser.add_argument('--use-tuning-last-layer', action='store_true', help='Flag for only fine-tuning pooler layer among base model layers')
@@ -320,13 +264,13 @@ if __name__ == "__main__":
     parser.add_argument('--direction', type=str, default='maximize', help='Direction to optimize')
     parser.add_argument('--max-length', type=int, default=512, help='Maximum length for token number')
     parser.add_argument('--seed', type=int, default=42, help='Seed')
-    parser.add_argument('--n-gpu', type=int, default=4, help='Number of GPU')
-    parser.add_argument('--study-name', type=str, default='HC_BERT', help='Optuna study name')
-    parser.add_argument('--max-evals', type=int, default=9, help='Maximum number of evaluation steps')
+    parser.add_argument('--n-gpu', type=int, default=1, help='Number of GPU')
+    parser.add_argument('--study-name', type=str, default='Train', help='Optuna study name')
+    parser.add_argument('--max-evals', type=int, default=90, help='Maximum number of evaluation steps')
     parser.add_argument('--eval-samples', type=int, default=40960, help='Number of training samples between two evaluations. It should be divisible by 32')
     parser.add_argument('--output-dir', type=str, default='outputs', help='HPO output directory')
     parser.add_argument('--eval-metric', type=str, default='f1', help='Evaluation metric')
-    parser.add_argument('--eval-metric-average', type=str, default='weighted', help='Evaluation metric average')
+    parser.add_argument('--eval-metric-average', type=str, default='macro', help='Evaluation metric average')
 
     # Parse the command line arguments
     args = parser.parse_args()
@@ -360,11 +304,6 @@ if __name__ == "__main__":
 
     args.study_name = f"{args.study_name}_max_evals{args.max_evals}_samples{args.eval_samples}"
 
-    # define class weights for focal loss
-    # df = pd.read_csv('datasets_/combined_dataset.csv')
-    # args.class_weights = get_class_weight(df)
-    # print(args.class_weights)
-
     print("MAIN - args",args)
 
     set_seed(args)
@@ -372,37 +311,28 @@ if __name__ == "__main__":
     # Initialize a new run
     wandb.init(project="TransVulDet", name=args.study_name)
 
-    tpeopts = optuna.samplers.TPESampler.hyperopt_parameters()
-    tpeopts.update({'n_startup_trials': 8})
+    # Function to tokenize on the fly
+    def encode(example):
+        # tokenized_inputs = tokenizer(example['code'], truncation=True, padding=True, max_length=args.max_length,return_tensors="pt").to(device)
+        tokenized_inputs = tokenizer(example['code'], truncation=True, padding=True, max_length=args.max_length, return_tensors="pt")
+        # tokenized_inputs['labels'] = one_hot_encode(example['assignedclass'])
+        tokenized_inputs['labels'] = example['assignedclass']
+        return tokenized_inputs
 
-    # Initialize Optuna study
-    study = optuna.create_study(
-        study_name=args.study_name,
-        direction=args.direction,
-        pruner=optuna.pruners.HyperbandPruner(
-            min_resource=1, max_resource=args.max_evals, reduction_factor=3
-        ),
-        sampler = optuna.samplers.TPESampler(
-            **tpeopts
-        ),
-        storage=f"sqlite:///database/{args.study_name}.db",
-        load_if_exists=True,
-        
-        )
-    study.optimize(lambda trial: objective(trial, args), n_trials=args.num_trials, timeout=258500)
+    # Load dataset and make huggingface datasts
+  
+    data_files = {
+        'train': f'{args.train_data_dir}',
+        'validation': f'{args.val_data_dir}',
+        'test': f'{args.test_data_dir}',
+        }
     
-    # Print results
-    print(f"Best trial: {study.best_trial.params}")
-    print(f"Best {args.eval_metric}: {study.best_value}")
+    dataset = load_dataset('csv', data_files=data_files)
+    # Set the transform function for on-the-fly tokenization
+    dataset.set_transform(encode)
 
-    location = f"{args.output_dir}/study.pkl"
+    train_dataset = dataset['train']
+    val_dataset = dataset['validation']
+    test_dataset = dataset['test']
 
-    pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
-    complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
-
-    joblib.dump(study, location)
-
-    print("Study statistics: ")
-    print("  Number of finished trials: ", len(study.trials))
-    print("  Number of pruned trials: ", len(pruned_trials))
-    print("  Number of complete trials: ", len(complete_trials))                                                                                                                        
+    print("TRAIN/VAL/TEST SET LENGTHS:",len(train_dataset), len(val_dataset), len(test_dataset))
