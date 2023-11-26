@@ -3,10 +3,6 @@
 TransVulDet is a Transformer-based Language Model for Vulnerability Detection aiming to better domain knowledge integration (e.g. CWE hierarchy) with source code datasets.
 
 ### Dataset
-* Multiclass Vulnerability Dataset (MVD)
-  * 40 CWEs, multiclass
-  * https://github.com/muVulDeePecker/muVulDeePecker
-  * mvd.txt(256.3MB)
 * Big-Vul dataset 
   * 91 CWE
   * https://dl.acm.org/doi/10.1145/3379597.3387501
@@ -22,8 +18,6 @@ TransVulDet is a Transformer-based Language Model for Vulnerability Detection ai
 Pre-trained Transformer-based Language Models
 * CodeBERT
 * GraphCodeBERT
-* BERT-based (BERT, RoBERTa, DistillBERT, etc)
-* T5
 
 ### Evaluation
 
