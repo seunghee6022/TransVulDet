@@ -81,7 +81,6 @@ def objective(trial, args):
     classifier_factor = trial.suggest_float("classifier_factor", 1e1, 1e5, log=True)
     weight_decay = trial.suggest_float("weight_decay", 1e-7, 1e-2, log=True)
     gradient_accumulation_steps = trial.suggest_int("gradient_accumulation_steps", 1, 32, log=True)
-    weight_factor = 1
     per_device_train_batch_size = 32
 
     # Create graph from JSON
@@ -106,13 +105,13 @@ def objective(trial, args):
     # Check if a GPU is available and use it, otherwise, use CPU
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
  
-    model, tokenizer = get_model_and_tokenizer(args, num_labels, prediction_target_uids, weight_factor, graph)
+    model, tokenizer = get_model_and_tokenizer(args, prediction_target_uids, graph)
     wandb.watch(model)
 
     # print(model)
     # Freeze all parameters of the model
     for param in model.parameters():
-        param.requires_grad = False
+        param.requires_grad = True
 
     # Unfreeze the classifier head: to fine-tune only the classifier head
     for param in model.classifier.parameters():
@@ -183,21 +182,21 @@ def objective(trial, args):
 
     eval_steps = int(round(args.eval_samples/(per_device_train_batch_size*gradient_accumulation_steps), -1))
 
-    random_str = base64.b64encode(secrets.token_bytes(12)).decode()
-    output_dir = f'./outputs/{args.study_name}_{random_str}'
-    args.output_dir = output_dir
-
     # Create the new directory to avoid to save the model checkpoints to the existing folders
-    os.makedirs(output_dir) # exist_ok = False
-
+    random_str = base64.b64encode(secrets.token_bytes(12)).decode()
+    args.output_dir = f'{args.output_dir}/{args.study_name}_{random_str}'
+    args.logging_dir = f'{args.logging_dir}/{args.study_name}_{random_str}'
+    os.makedirs(args.output_dir) # exist_ok = False
+    os.makedirs(args.logging_dir) # exist_ok = False
+    
     training_args = TrainingArguments(
         per_device_train_batch_size=per_device_train_batch_size,
         gradient_accumulation_steps=gradient_accumulation_steps,
         per_device_eval_batch_size=32,
         max_steps=eval_steps*args.max_evals,
         weight_decay=weight_decay,
-        logging_dir='./logs',
-        output_dir=output_dir,
+        logging_dir=args.logging_dir,
+        output_dir=args.output_dir,
         evaluation_strategy="steps",
         eval_steps=eval_steps,  
         save_steps=eval_steps,
@@ -215,8 +214,7 @@ def objective(trial, args):
         "eps": training_args.adam_epsilon,
     }
 
-    base_lr = lr/classifier_factor
-    classifier_lr = lr
+    
 
     '''
     1. classifier
@@ -234,46 +232,30 @@ def objective(trial, args):
     default classifier
 
     '''
+    
+    base_lr = lr/classifier_factor
+    if args.debug_mode:
+        optimizer = AdamW(model.parameters(), lr=2e-5)
 
-    classifier_params_names = [n for n, p in model.classifier.named_parameters()] #['dense.weight', 'dense.bias', 'out_proj.weight', 'out_proj.bias']
-    # print("classifier_params_names",classifier_params_names)
-    classifier_params = list(model.classifier.parameters())
-    # print("classifier_params", classifier_params)
-    optimizer = AdamW([ {"params": classifier_params, "lr": classifier_lr} ], **adam_kwargs)
+    else:
+        classifier_params = list(model.classifier.parameters())
+        base_params_names = [n for n, p in model.named_parameters() if 'classifier' not in n]
+        # print(base_params_names)
+        base_params = [p for n, p in model.named_parameters() if 'classifier' not in n] 
+        if args.use_bilstm:
+            bilstm_params = list(model.bilstm.parameters())
+            bilistm_lr = trial.suggest_float("BiLSTM_learning_rate", 1e-5, 1e-1, log=True)
+            base_params = list(model.model.parameters())
+            optimizer = AdamW([ { "params":  base_params, "lr": base_lr}, {"params": bilstm_params, "lr": bilistm_lr}, {"params": classifier_params, "lr": lr} ], **adam_kwargs)
 
-    if not args.use_tuning_classifier: # only classifier
-        # Parameters of the base model without the classification head
-        if args.use_tuning_last_layer: # last layer + classifier
-            pooler_params_names = [n for n, p in model.named_parameters() if 'pooler' in n]
-            base_params_names = [n for n, p in model.named_parameters() if 'encoder.layer.11.output' in n]
-            # print("pooler_params Name:\n",pooler_params_names)
-            # print("base_params Name:\n",base_params_names)
-            base_params = [p for n, p in model.named_parameters() if 'encoder.layer.11.output' in n] # last layer
-            if args.use_hierarchical_classifier:
-                pooler_params = [p for n, p in model.named_parameters() if 'pooler' in n]
-                base_params.append(pooler_params)
-        else: # whole pre-trained model layers
-            base_params_names = [n for n, p in model.named_parameters() if 'classifier' not in n]
-            # print("base_params Name:\n",base_params_names)
-            base_params = [p for n, p in model.named_parameters() if 'classifier' not in n] 
-
-        temp_params = []
-        for param in base_params:
-            if type(param) is list:
-                for p in param:
-                    p.requires_grad = True
-                    temp_params.append(p)
-            else:
-                param.requires_grad = True
-                temp_params.append(param)
-        base_params = temp_params
-
-        optimizer = AdamW([ { "params":  base_params, "lr": base_lr}, {"params": classifier_params, "lr": classifier_lr} ], **adam_kwargs)
+        else:
+            optimizer = AdamW([ { "params":  base_params, "lr": base_lr}, {"params": classifier_params, "lr": lr} ], **adam_kwargs)
 
     trainer = CustomTrainer(
         use_hierarchical_classifier = args.use_hierarchical_classifier,
         prediction_target_uids = prediction_target_uids,
         use_focal_loss = args.use_focal_loss,
+        use_bilstm = args.use_bilstm,
         class_weights = class_weights,
         model=model,
         args=training_args,
@@ -311,6 +293,7 @@ if __name__ == "__main__":
     parser.add_argument('--debug-mode', action='store_true', help='Flag for using small dataset for debug')
     parser.add_argument('--model-name', type=str, default='bert-base-uncased', help='Name of the model to use')
     parser.add_argument('--num-trials', type=int, default=1, help='Number of trials for Optuna')
+    parser.add_argument('--use-bilstm', action='store_true', help='Flag for BiLSTM with Transformer Model')
     parser.add_argument('--use-weight-sampling', action='store_true', help='Flag for using weight sampling')
     parser.add_argument('--use-hierarchical-classifier', action='store_true', help='Flag for hierarchical classification') #--use-hierarchical-classifier --> true
     parser.add_argument('--use-tuning-last-layer', action='store_true', help='Flag for only fine-tuning pooler layer among base model layers')
@@ -320,23 +303,24 @@ if __name__ == "__main__":
     parser.add_argument('--direction', type=str, default='maximize', help='Direction to optimize')
     parser.add_argument('--max-length', type=int, default=512, help='Maximum length for token number')
     parser.add_argument('--seed', type=int, default=42, help='Seed')
-    parser.add_argument('--n-gpu', type=int, default=4, help='Number of GPU')
-    parser.add_argument('--study-name', type=str, default='HC_BERT', help='Optuna study name')
+    parser.add_argument('--n-gpu', type=int, default=1, help='Number of GPU')
+    parser.add_argument('--study-name', type=str, default='2311_FT', help='Optuna study name')
     parser.add_argument('--max-evals', type=int, default=9, help='Maximum number of evaluation steps')
     parser.add_argument('--eval-samples', type=int, default=40960, help='Number of training samples between two evaluations. It should be divisible by 32')
-    parser.add_argument('--output-dir', type=str, default='outputs', help='HPO output directory')
+    parser.add_argument('--output-dir', type=str, default='./outputs', help='HPO output directory')
+    parser.add_argument('--logging-dir', type=str, default='./logs', help='Trainer log directory')
     parser.add_argument('--eval-metric', type=str, default='f1', help='Evaluation metric')
-    parser.add_argument('--eval-metric-average', type=str, default='weighted', help='Evaluation metric average')
+    parser.add_argument('--eval-metric-average', type=str, default='macro', help='Evaluation metric average')
 
     # Parse the command line arguments
     args = parser.parse_args()
 
     args.study_name = f"{args.study_name}_{args.eval_metric}"
-    if args.debug_mode:
-        args.study_name = f"{args.study_name}_debug"
-        args.train_data_dir = 'datasets_/2nd_latest_datasets/train_small_data.csv'
-        args.test_data_dir = 'datasets_/2nd_latest_datasets/test_small_data.csv'
-        args.val_data_dir = 'datasets_/2nd_latest_datasets/val_small_data.csv'
+    # if args.debug_mode:
+    #     args.study_name = f"{args.study_name}_debug"
+    #     args.train_data_dir = 'datasets_/2nd_latest_datasets/train_small_data.csv'
+    #     args.test_data_dir = 'datasets_/2nd_latest_datasets/test_small_data.csv'
+    #     args.val_data_dir = 'datasets_/2nd_latest_datasets/val_small_data.csv'
 
     if not args.use_tuning_classifier:
         if args.use_tuning_last_layer:
@@ -359,7 +343,7 @@ if __name__ == "__main__":
         raise ValueError(f"--eval-samples {args.eval_samples} is not divisible by 32")
 
     args.study_name = f"{args.study_name}_max_evals{args.max_evals}_samples{args.eval_samples}"
-
+    
     # define class weights for focal loss
     # df = pd.read_csv('datasets_/combined_dataset.csv')
     # args.class_weights = get_class_weight(df)
@@ -390,7 +374,7 @@ if __name__ == "__main__":
         
         )
     study.optimize(lambda trial: objective(trial, args), n_trials=args.num_trials, timeout=258500)
-    
+
     # Print results
     print(f"Best trial: {study.best_trial.params}")
     print(f"Best {args.eval_metric}: {study.best_value}")
@@ -405,4 +389,4 @@ if __name__ == "__main__":
     print("Study statistics: ")
     print("  Number of finished trials: ", len(study.trials))
     print("  Number of pruned trials: ", len(pruned_trials))
-    print("  Number of complete trials: ", len(complete_trials))                                                                                                                        
+    print("  Number of complete trials: ", len(complete_trials))

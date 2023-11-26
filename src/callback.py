@@ -14,6 +14,7 @@ class EarlyStoppingCallback(TrainerCallback):
         eval_loss = state.log_history[-1]['eval_loss']
         score = -eval_loss
         # print("INSIDE early stopping!!")
+        
         if self.best_score is None:
             self.best_score = score
             # print("self.best_score:",-self.best_score)
@@ -26,7 +27,6 @@ class EarlyStoppingCallback(TrainerCallback):
         else:
             self.best_score = score
             self.counter = 0
-
 
 class WandbCallback(TrainerCallback):
     def on_log(self, args: TrainingArguments, state: TrainerState, control:TrainerControl, logs=None, **kwargs):

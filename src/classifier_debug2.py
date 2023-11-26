@@ -7,46 +7,41 @@ from transformers import (
     AutoTokenizer,AutoModel,AutoModelForSequenceClassification,
 )
 
-def get_model_and_tokenizer(args, prediction_target_uids,graph):
+def get_model_and_tokenizer(args, num_labels, prediction_target_uids, weight_factor, graph):
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-    if args.use_hierarchical_classifier or args.use_bilstm:
+    if args.use_hierarchical_classifier:
         model = TransformerWithHierarchicalClassifier(
-            args.model_name, prediction_target_uids, graph, args.use_bilstm, args.use_hierarchical_classifier, args.loss_weight, embedding_dim=768)
+            args.model_name, prediction_target_uids, graph, weight_factor, args.loss_weight, embedding_dim=num_labels)
     else:
         model = AutoModelForSequenceClassification.from_pretrained(args.model_name, num_labels=len(prediction_target_uids))
     return model, tokenizer
 
 class TransformerWithHierarchicalClassifier(nn.Module):
-    def __init__(self, model_name, prediction_target_uids, graph, use_bilstm, use_hierarchical_classifier, _weighting='equalize',embedding_dim=768):
+    def __init__(self, model_name, prediction_target_uids, graph, weight_factor, _weighting='equalize',embedding_dim=768):
         super(TransformerWithHierarchicalClassifier, self).__init__()
-        self.use_hierarchical_classifier = use_hierarchical_classifier
+        self.weight_factor = 1 #weight_factor
+        self.input_dim = self.model.config.hidden_size
         self.embedding_dim = embedding_dim
         self.graph = graph
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+        self.model_name = model_name
+        self.transformer_model = AutoModel.from_pretrained(self.model_name)
+        self.bilstm =  nn.LSTM(input_size=self.embedding_dim,  # Size of CodeBERT embeddings
+                               hidden_size=self.embedding_dim,
+                               num_layers=2,
+                               bidirectional=True,
+                               batch_first=True) #(batch, seq, feature)
+        
+        # Here, replace BERT's linear classifier with hierarchical classifier
+        self.classifier = HierarchicalClassifier(self.input_dim, self.embedding_dim, self.graph)
+
         self._force_prediction_targets = True
         self.prediction_target_uids = prediction_target_uids
-         # Here, replace BERT's linear classifier with hierarchical classifier
+    
         self.topo_sorted_uids = None
         self.uid_to_dimension = None
         self.set_uid_to_dimension_and_topo_sorted_uids() # set the uid_to_dimension and topo_sorted_uids
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.use_bilstm = use_bilstm
-        self.bidirectional = True
-        self.model_name = model_name
-        self.model = AutoModel.from_pretrained(self.model_name)
-        self.lstm_hidden_dim = 256
-        self.bilstm =  torch.nn.LSTM(input_size=self.embedding_dim, 
-                               hidden_size=self.lstm_hidden_dim,
-                               num_layers=2,
-                               bidirectional=self.bidirectional,
-                               batch_first=True) #(batch, seq, feature)
-        
-        self.input_dim= self.lstm_hidden_dim*2 if self.use_bilstm  else self.embedding_dim
-        self.classifier = HierarchicalClassifier(self.input_dim, len(self.uid_to_dimension), self.graph)
-        print("self.input_dim",self.input_dim)
-        # Define a fully connected layer that outputs num_classes predictions
-        self.fc = nn.Linear(self.input_dim, len(self.prediction_target_uids))
-        # Softmax layer for the output
-        self.softmax = nn.LogSoftmax(dim=1)
         # print(f"self.uid_to_dimension:{self.uid_to_dimension}\nself.topo_sorted_uids:{self.topo_sorted_uids}")
         self._weighting = _weighting
         self.loss_weights = np.ones(len(self.uid_to_dimension))
@@ -96,8 +91,8 @@ class TransformerWithHierarchicalClassifier(nn.Module):
 
                 for i, uid in enumerate(self.uid_to_dimension):
                     self.loss_weights[i] *= (
-                        len(nx.descendants(self.graph, uid)) + 1.0
-                       
+                        # len(nx.descendants(self.graph, uid)) + 1.0
+                        len(nx.descendants(self.graph, uid)) + self.weight_factor
                     )  # Add one for the node itself.
                 
             except ZeroDivisionError as err:
@@ -117,8 +112,8 @@ class TransformerWithHierarchicalClassifier(nn.Module):
                     reachable_leaf_nodes = descendants.intersection(
                         self.prediction_target_uids
                     )
-                    
-                    self.loss_weights[i] *= len(reachable_leaf_nodes)
+                    self.loss_weights[i] *= len(reachable_leaf_nodes) * self.weight_factor
+                    # self.loss_weights[i] *= len(reachable_leaf_nodes)
 
                     # Test if any leaf nodes are reachable
                     if len(reachable_leaf_nodes) == 0:
@@ -140,31 +135,29 @@ class TransformerWithHierarchicalClassifier(nn.Module):
         outputs = self.model(
             input_ids,
             attention_mask=attention_mask,
-            position_ids=position_ids,
+            position_ids=position_ids, 
         )
 
-        last_hidden_state = outputs.last_hidden_state  # Shape: (batch_size, sequence_length, hidden_size)
-        # print("last_hidden_state", last_hidden_state.shape)
-        if self.use_bilstm:
-            # last_hidden_state = last_hidden_state.permute(1, 2, 0)  # New shape will be [512, 768, 32]
-            # print("permute last_hidden_state", last_hidden_state.shape)
-            # print("use_bilstm!!!!")
-            lstm_out, _ = self.bilstm(last_hidden_state)
-            # print("[forward] lstm_out",lstm_out.shape)
-            lstm_out = lstm_out[:, -1, :]
-            # print("[forward] lstm_out[:, -1, :]", lstm_out.shape,lstm_out)
-            if self.use_hierarchical_classifier:
-                logits = self.classifier(lstm_out)
-                # print("[forward - HC + LSTM] logits", logits.shape)
-            else:
-                logits = self.fc(lstm_out)
-                # prob = self.softmax(logits)
-                # print("[forward - HC] logits", logits.shape)
-        else:
-            cls_output = last_hidden_state[:, 0, :] # Take the representation of [CLS] token - [batch_size, tokens, hidden_dim] CLS token is the first token of last hidden state
-            # print("cls_output = last_hidden_state[:, 0, :] ", cls_output.shape)
-            logits = self.classifier(cls_output)
-            # print("[forward NC] logits", logits.shape)
+        # Get the last hidden states
+        last_hidden_state = outputs.last_hidden_state
+        
+        # Pass the last hidden states through the BiLSTM
+        lstm_out, _ = self.bilstm(last_hidden_state)
+        print("[forward] lstm_out",lstm_out)
+        # Since we are doing classification, we only need the output from the last LSTM cell
+        lstm_out = lstm_out[:, -1, :]
+        print("[forward] lstm_out[:, -1, :]", lstm_out.shape(),lstm_out)
+        # Pass the output of the LSTM through the fully connected layer
+
+        logits = self.classifier(lstm_out)
+        print("[forward] logits", logits)
+        
+        # # Apply softmax to get probabilities
+        # probs = self.softmax(logits)
+        
+        # return probs
+        
+        # print("[forward] logits", logits)
         
         if labels is not None:
             loss = self.loss(logits, labels)
@@ -172,6 +165,39 @@ class TransformerWithHierarchicalClassifier(nn.Module):
         else:
             return logits
     
+    # def one_hot_labels_to_cweIDs_labels(self, ground_truth):
+    #         '''
+    #         ground_truth is one-hot-encoded
+    #         uid: cwe id
+    #         '''
+    #         # Reverse the dictionary
+    #         dim_to_uid = {v: k for k, v in self.uid_to_dimension.items()}
+
+    #         # Get the indices where value is 1 in each row of ground_truth and map to keys
+    #         # indices = [row.nonzero().item() for row in ground_truth]
+    #         indices = torch.argmax(ground_truth, dim=1).tolist()
+    #         uid_labels = [dim_to_uid[idx] for idx in indices]
+    def forward(self, input_ids, attention_mask):
+        # Pass the input through GraphCodeBERT
+        outputs = self.codebert(input_ids=input_ids, attention_mask=attention_mask)
+        
+        # Get the last hidden states
+        last_hidden_state = outputs.last_hidden_state
+        
+        # Pass the last hidden states through the BiLSTM
+        lstm_out, _ = self.bilstm(last_hidden_state)
+        
+        # Since we are doing classification, we only need the output from the last LSTM cell
+        lstm_out = lstm_out[:, -1, :]
+        
+        # Pass the output of the LSTM through the fully connected layer
+        logits = self.fc(lstm_out)
+        
+        # Apply softmax to get probabilities
+        probs = self.softmax(logits)
+        
+        return probs
+    #         return uid_labels
     
     def embed(self, labels):
         embedding = np.zeros((len(labels), len(self.uid_to_dimension)))
@@ -189,7 +215,6 @@ class TransformerWithHierarchicalClassifier(nn.Module):
     
     
     def loss(self, logits, targets, weight_batch=None, global_step=None):
-        # print("[loss]logits",logits.shape)
         '''
         ground_truth should be cwe id values. Given ground_truth is one-hot-encoded so needed to be converted to cwe_id list
         '''
@@ -226,8 +251,8 @@ class TransformerWithHierarchicalClassifier(nn.Module):
 
         embedding = self.embed(targets)
         # print(f"embedding {embedding.shape} {embedding}")
-        prediction = logits # batch*size, len(uid_to_dimension) : 32*32
-        # print(f"[Loss function in HC classifier]Prediction = logits {logits.shape} {logits}")
+        prediction = logits # forward instead of predict_embedded funtion
+        # print(f"prediction {prediction.shape} {prediction}")
         
         # Clipping predictions for stability
         clipped_probs = torch.clamp(prediction, 1e-7, 1.0 - 1e-7)
@@ -238,7 +263,6 @@ class TransformerWithHierarchicalClassifier(nn.Module):
         clipped_probs = clipped_probs.to(self.device)
         loss_mask = loss_mask.to(self.device)
         self.loss_weights = self.loss_weights.to(self.device)
-        # print("embedding",embedding.shape, "clipped_probs", clipped_probs.shape,"loss_mask", loss_mask.shape,"self.loss_weights", self.loss_weights )
        
         # Binary cross entropy loss calculation
         the_loss = -(
@@ -334,18 +358,16 @@ class TransformerWithHierarchicalClassifier(nn.Module):
         return cwe_id_list
 
 class HierarchicalClassifier(nn.Module):
-    def __init__(self, input_dim=768, output_dim=None, graph=None):
+    def __init__(self, input_dim=786, embedding_dim=None, graph=None):
         super(HierarchicalClassifier, self).__init__()
-        print("input_dim",input_dim,"output_dim",output_dim)
-        self.linear = nn.Linear(input_dim, output_dim)
+        self.linear = nn.Linear(input_dim, embedding_dim)
         self.sigmoid = nn.Sigmoid() # Sigmoid activation layer
-        self._l2_regularization_coefficient = 5e-5
+        self._l2_regularization_coefficient = 5e-4
        
         # Initialize weights and biases to zero
-        # nn.init.normal_(self.linear.weight, mean=0.0, std=1.0)
-        nn.init.zeros_(self.linear.weight) # initialize to 0 --> ask..? with not 0?
+        nn.init.normal_(self.linear.weight, mean=0.0, std=1.0)
+        # nn.init.zeros_(self.linear.weight) # initialize to 0 --> ask..? with not 0?
         nn.init.zeros_(self.linear.bias) 
-        print("self.linear.weight",self.linear.weight.shape,"self.linear.bias", self.linear.bias.shape )
         
     def forward(self, x):
         x = self.linear(x)  # Linear transformation
