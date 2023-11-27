@@ -66,9 +66,6 @@ class vulDataset(Dataset):
   def __init__(self, encodings, labels):
     self.encodings = encodings
     self.labels = labels
-    print("Inside vulDataset!!!!!!!!!!!!!")
-    print("self.encodings", self.encodings)
-    print("self.labels", self.labels)
 
   def __getitem__(self, idx):
 

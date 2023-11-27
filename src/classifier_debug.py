@@ -2,20 +2,24 @@ import torch
 import torch.nn as nn
 import numpy as np
 import networkx as nx
-
+from transformers.modeling_utils import PreTrainedModel ,PretrainedConfig
 from transformers import (
-    AutoTokenizer,AutoModel,AutoModelForSequenceClassification,
+    AutoTokenizer,AutoModel,AutoModelForSequenceClassification,RobertaConfig
 )
 
 def get_model_and_tokenizer(args, prediction_target_uids,graph):
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    config = RobertaConfig()
     if args.use_hierarchical_classifier or args.use_bilstm:
         model = TransformerWithHierarchicalClassifier(
-            args.model_name, prediction_target_uids, graph, args.use_bilstm, args.use_hierarchical_classifier, args.loss_weight, embedding_dim=768)
+            args.model_name, prediction_target_uids, graph, args.use_bilstm, args.use_hierarchical_classifier, args.loss_weight, embedding_dim=768) #config=config
     else:
         model = AutoModelForSequenceClassification.from_pretrained(args.model_name, num_labels=len(prediction_target_uids))
     return model, tokenizer
 
+# class TransformerWithHierarchicalClassifier(PreTrainedModel):
+#     def __init__(self, model_name, prediction_target_uids, graph, use_bilstm, use_hierarchical_classifier, _weighting='equalize',embedding_dim=768, config=None):
+#         super(TransformerWithHierarchicalClassifier, self).__init__(config)
 class TransformerWithHierarchicalClassifier(nn.Module):
     def __init__(self, model_name, prediction_target_uids, graph, use_bilstm, use_hierarchical_classifier, _weighting='equalize',embedding_dim=768):
         super(TransformerWithHierarchicalClassifier, self).__init__()
@@ -34,19 +38,22 @@ class TransformerWithHierarchicalClassifier(nn.Module):
         self.model_name = model_name
         self.model = AutoModel.from_pretrained(self.model_name)
         self.lstm_hidden_dim = 256
-        self.bilstm =  torch.nn.LSTM(input_size=self.embedding_dim, 
+        self.input_dim= self.lstm_hidden_dim*2 if self.use_bilstm  else self.embedding_dim
+        print("self.input_dim",self.input_dim)
+        if self.use_bilstm:
+            
+            self.bilstm =  torch.nn.LSTM(input_size=self.embedding_dim, 
                                hidden_size=self.lstm_hidden_dim,
                                num_layers=2,
                                bidirectional=self.bidirectional,
                                batch_first=True) #(batch, seq, feature)
+            if self.use_hierarchical_classifier:
+                self.classifier = HierarchicalClassifier(self.input_dim, len(self.uid_to_dimension), self.graph)
+            else:
+                self.fc = nn.Linear(self.input_dim, len(self.prediction_target_uids))
         
-        self.input_dim= self.lstm_hidden_dim*2 if self.use_bilstm  else self.embedding_dim
+        
         self.classifier = HierarchicalClassifier(self.input_dim, len(self.uid_to_dimension), self.graph)
-        print("self.input_dim",self.input_dim)
-        # Define a fully connected layer that outputs num_classes predictions
-        self.fc = nn.Linear(self.input_dim, len(self.prediction_target_uids))
-        # Softmax layer for the output
-        self.softmax = nn.LogSoftmax(dim=1)
         # print(f"self.uid_to_dimension:{self.uid_to_dimension}\nself.topo_sorted_uids:{self.topo_sorted_uids}")
         self._weighting = _weighting
         self.loss_weights = np.ones(len(self.uid_to_dimension))
