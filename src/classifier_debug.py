@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 import networkx as nx
 from transformers.modeling_utils import PreTrainedModel ,PretrainedConfig
@@ -142,14 +143,14 @@ class TransformerWithHierarchicalClassifier(nn.Module):
         self.loss_weights = torch.tensor(self.loss_weights, dtype=torch.float32)
         # print(f"self._weighting == {self._weighting} --> self.loss_weights = {self.loss_weights}")
 
-    def forward(self, input_ids, attention_mask=None, labels=None, token_type_ids=None, position_ids=None, head_mask=None, inputs_embeds=None):
+    def forward(self, input_ids, attention_mask=None,  labels=None, **kwargs):
         # print("INSIDE TransforerWithHierarchicalClassifier Forward")
         outputs = self.model(
             input_ids,
             attention_mask=attention_mask,
-            position_ids=position_ids,
+            **kwargs
         )
-
+        labels=None
         last_hidden_state = outputs.last_hidden_state  # Shape: (batch_size, sequence_length, hidden_size)
         # print("last_hidden_state", last_hidden_state.shape)
         if self.use_bilstm:
@@ -165,6 +166,7 @@ class TransformerWithHierarchicalClassifier(nn.Module):
                 # print("[forward - HC + LSTM] logits", logits.shape)
             else:
                 logits = self.fc(lstm_out)
+                
                 # prob = self.softmax(logits)
                 # print("[forward - HC] logits", logits.shape)
         else:

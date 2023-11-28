@@ -6,13 +6,38 @@ from transformers import AutoModel
 from src.graph import create_graph_from_json
 from src.classifier_debug import get_model_and_tokenizer
 from src.dataset import vulDataset
+# from main_hpo_sqlite_debug import mapping_cwe_to_target_label, map_predictions_to_target_labels
 from transformers import RobertaModel, RobertaConfig, RobertaTokenizer
 from torch.utils.data import DataLoader
 import argparse
+import numpy as np
 import pandas as pd
 from torch.nn.functional import softmax
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, balanced_accuracy_score
+import subprocess
 
+
+def map_predictions_to_target_labels(predictions, target_to_dimension):
+    # print("predictions",predictions.shape)
+    pred_labels = []
+    # print("predictions",len(predictions),predictions)
+    for pred in predictions:
+        # Find the index of the max softmax probability
+        softmax_idx = np.argmax(pred)
+        # print(softmax_idx)
+        cwe_id = list(target_to_dimension.keys())[softmax_idx]
+        # print("softmax_idx:",softmax_idx, "pred:",pred, "cwe_id",cwe_id)
+        if cwe_id not in list(target_to_dimension.keys()):
+            print(f"cwe_id:{cwe_id} is NOT in target_to_dimension!!!!!")
+        cwe_target_idx = target_to_dimension[cwe_id]
+        pred_labels.append(cwe_target_idx)
+
+    return pred_labels
+
+def mapping_cwe_to_target_label(cwe_label, target_to_dimension):
+        # Convert each tensor element to its corresponding dictionary value
+        mapped_labels = [target_to_dimension[int(cwe_id)] for cwe_id in cwe_label]
+        return mapped_labels
 
 def load_best_model_with_best_accuracy(args):
     # Find the last checkpoint folder
@@ -110,8 +135,8 @@ def find_best_checkpoint_by_macro_f1(args):
                 
     # best_model_path = f'{args.checkpoint_dir}/{best_checkpoint}'
     best_model_path = f'{args.checkpoint_dir}/{last_checkpoint_folder}'
-    # print("MARCO F1 -- best_model_path",best_model_path)
-    print("MARCO F1 -- last_model_path",best_model_path)
+    print("MARCO F1 -- best_model_path",best_model_path)
+    # print("MARCO F1 -- last_model_path",best_model_path)
 
     config = RobertaConfig()
     model = RobertaModel(config)
@@ -138,7 +163,7 @@ if __name__ == "__main__":
     torch.cuda.empty_cache()
     print("This is load_best_model_and_compute_metric.py")
  
-    parser = argparse.ArgumentParser(description="Hyperparameter optimization using Optuna")
+    parser = argparse.ArgumentParser(description="Fine-tuning Models")
 
     # Add arguments
     parser.add_argument('--checkpoint-dir', type=str, default='./outputs', help='Path to the checkpoint directory')
@@ -169,17 +194,90 @@ if __name__ == "__main__":
         args.model_name = "microsoft/graphcodebert-base" 
     else:
         args.model_name = "microsoft/codebert-base" 
-
+    
     print("args.checkpoint_dir)",args.checkpoint_dir)
     print("Args",args)
-    acc_model, acc_tokenizer = load_best_model_with_best_accuracy(args)
-    macro_model, macro_tokenizer = find_best_checkpoint_by_macro_f1(args)
 
+    # Create graph from JSON
+    with open(args.node_paths_dir, 'r') as f:
+        paths_dict_data = json.load(f)
+   
+    # actual targets to be predicted
+    prediction_target_uids = [int(key) for key in paths_dict_data.keys()]
+    # print("prediction_target_uids",prediction_target_uids)
+    target_to_dimension = {target:idx for idx,target in enumerate(prediction_target_uids)}
+    # print("target_to_dimension", target_to_dimension)
+    graph = create_graph_from_json(paths_dict_data, max_depth=None)
+
+
+    # acc_model, acc_tokenizer = load_best_model_with_best_accuracy(args)
+    model, tokenizer = find_best_checkpoint_by_macro_f1(args)
+   
+    
+    def compute_metrics(predictions, labels):
+        print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
+        print("Initial argmax idex prediction", predictions[:10], "target_to_dimension", target_to_dimension)
+        
+        # print("[compute_metrics]p.label_ids before mapping_cwe_to_target_label", p.label_ids)
+        labels = mapping_cwe_to_target_label(labels, target_to_dimension)
+        print("[compute_metrics] @@@@@@@ labels [:30]", labels[:30])
+        
+        if args.use_hierarchical_classifier:
+            # prediction value is maxarg index from all nodes
+            # dim_to_cwe = {v:k for k,v in model.uid_to_dimension.items()}
+            # predictions = [dim_to_cwe[pred] for pred in predictions]
+            print("prediction", predictions[:10], "target_to_dimension", target_to_dimension)
+    
+            pred_dist = model.deembed_dist(predictions) # get probabilities of each nodes
+            # print("[if args.use_hierarchical_classifier]pred_dist",pred_dist)
+            pred_cwe_labels = model.dist_to_cwe_ids(pred_dist)
+            # print("[if args.use_hierarchical_classifier]pred_cwe_labels",pred_cwe_labels)
+            pred_labels = mapping_cwe_to_target_label(pred_cwe_labels, target_to_dimension)
+            print(f"[Hierarchical Classifier]Unique value: {len(set(pred_labels))} @@@@@@@ pred_labels[:30]:{pred_labels[:30]}")
+        else:
+            pred_labels = predictions
+            print("prediction", predictions[:10], "target_to_dimension", prediction_target_uids)
+    
+            # pred_labels = [prediction_target_uids[pred] for pred in predictions]
+            # print("prediction", predictions[:10], "target_to_dimension", prediction_target_uids)
+            # print("predictions", len(predictions), predictions)
+            # pred_labels = map_predictions_to_target_labels(predictions, target_to_dimension)
+            print(f"[Normal Classifiacation]{len(set(pred_labels))} @@@@@@@ pred_labels[:30]:{pred_labels[:30]}")
+        predictions = pred_labels
+
+        # unique_label_list = list(set(labels))
+        #  # Convert predictions to binary: non-zero becomes 1
+        binary_predictions = [1 if pred != 0 else 0 for pred in predictions]
+        binary_labels = [1 if label != 0 else 0 for label in labels]
+        unique_label_list = list(set(labels))
+        precision, recall, macro_f1, _ = precision_recall_fscore_support(labels, predictions, average='macro', zero_division=0)
+        weighted_precision, weighted_recall, weighted_f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted', zero_division=0)
+        acc = accuracy_score(labels, predictions)
+        balanced_acc = balanced_accuracy_score(labels, predictions)
+
+        # Compute binary metrics
+        binary_precision, binary_recall, binary_f1, _ = precision_recall_fscore_support(binary_labels, binary_predictions, average='binary', zero_division=0)
+        binary_acc = accuracy_score(binary_labels, binary_predictions)
+
+        return {
+            "balanced_accuracy": balanced_acc,
+            "accuracy": acc,
+            "macro_f1": macro_f1,
+            "weighted_f1": weighted_f1,
+            "precision": precision,
+            "recall": recall,
+            "binary_accuracy": binary_acc,
+            "binary_precision": binary_precision,
+            "binary_recall": binary_recall,
+            "binary_f1": binary_f1
+        }
+    
     def compute_test_metric(predictions, labels):
+        # print("predictions",predictions)
         if not args.use_hierarchical_classifier:
             print(f"{args.loss_weight} - predictions: {type(predictions)}, labels: {type(labels),len(labels)}")
             print(f"{args.loss_weight} - predictions: {(predictions.shape)}, labels: {type(labels),len(labels)}")
-        
+           
         # unique_label_list = list(set(labels))
         #  # Convert predictions to binary: non-zero becomes 1
         binary_predictions = [1 if pred != 0 else 0 for pred in predictions]
@@ -234,16 +332,66 @@ if __name__ == "__main__":
         with torch.no_grad():
             for batch in test_loader:
                 batch = {k: v.to(device) for k, v in batch.items()}
-                loss, logits = model(**batch)
-                # logits = outputs.logits
-                predictions = softmax(logits, dim=1)
-                predicted_labels = torch.argmax(predictions, dim=1)
+                logits = model(batch['input_ids'], attention_mask=batch['attention_mask'])
+                if not args.use_hierarchical_classifier:
+                    logits = logits.logits
+                    logits = softmax(logits, dim=1)
+                    predicted_labels = torch.argmax(logits, dim=1)
+                else:
+                    predicted_labels = logits
+                
                 prediction_list.extend(predicted_labels.cpu().numpy().tolist())
 
-        metrics = compute_test_metric(prediction_list, labels)
+        metrics = compute_metrics(prediction_list, labels)
         print(metrics)
 
     # print("@@@@@@@@@@@@@@@ Best Model with Best Acc:")
     # eval(acc_model)
     print("@@@@@@@@@@@@@@@ Best Model with Best macro_f1:")
-    eval(macro_model, macro_tokenizer, args)
+    # eval(model, tokenizer, args)
+    # Walk through the output folder
+    
+    def get_checkpoint_folders(output_folder, metric_list):
+        model_names = ['CodeBERT','GraphCodeBERT']
+        loss_types = ['CE','FL','default','equalize','descendants','reachable_leaf_nodes']
+
+        for model_name in model_names:
+            if 'Graph' in args.checkpoint_dir:
+                args.model_name = "microsoft/graphcodebert-base" 
+            else:
+                args.model_name = "microsoft/codebert-base" 
+
+            for loss_type in loss_types:
+                args.loss_weight = loss_type
+                if loss_type == 'CE':
+                    args.use_hierarchical_classifier = 'False'
+                    args.use_focal_loss = 'False'
+                elif loss_type == 'FL':
+                    args.use_hierarchical_classifier = 'False'
+                    args.use_focal_loss = 'True'
+                else:
+                    args.use_hierarchical_classifier = 'True'
+                    
+                key = f'{model_name}_{loss_type}'
+                
+                if key not in metric_list.keys():
+                    metric_list[key] = {
+                        'dir_name':[],
+                        'metrics':[],}
+                for root, dirs, files in os.walk(output_folder):
+                    for dir_name in dirs:
+                        # Check if directory name contains 'CodeBERT' and 'default'
+                        if model_name == dir_name[:len(model_name)] and loss_type in dir_name:
+                            full_path = os.path.join(root, dir_name)
+                            args.checkpoint_dir = full_path
+                            model, tokenizer = find_best_checkpoint_by_macro_f1(args)
+                            metric = eval(model, tokenizer, args)
+                            metric_list[key]['dir_name'].append(dir_name)
+                            metric_list[key]['metrics'].append(metric)
+                print(f"key:{key} | test metric:{metric_list[key]}")
+        print("Final METRIC",metric_list)
+
+    metric_list = {}
+    output_folder = './outputs'
+    get_checkpoint_folders(output_folder, metric_list)
+            
