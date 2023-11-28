@@ -77,7 +77,8 @@ def train(args, best_param):
     classifier_factor = best_param['classifier_factor']
     weight_decay = best_param['weight_decay']
     gradient_accumulation_steps = best_param['gradient_accumulation_steps']
-    # bilistm_lr = best_param['BiLSTM_learning_rate'] if best_param['BiLSTM_learning_rate'] else 2e-5
+    if args.use_bilstm:
+        bilistm_lr = best_param['BiLSTM_learning_rate'] if best_param['BiLSTM_learning_rate'] else 2e-5
     per_device_train_batch_size = 32
 
     # Create graph from JSON
@@ -280,18 +281,6 @@ def train(args, best_param):
     wandb.log(eval_metrics)
     print("Test metrics:",eval_metrics)
 
-    # print("FINAL EVALUATION ON TEST SET")
-    # trainer.eval_dataset = test_dataset
-    # # Evaluate the model on the test dataset
-    # test_metrics = trainer.evaluate()
-    # # Modify keys as per your requirement
-    # test_metrics = {
-    #     (k.replace("eval_", "test_") if "eval_" in k else "test_" + k): v for k, v in test_metrics.items()
-    # }
-    # wandb.log(test_metrics)
-
-    # # Print the results
-    # print(test_metrics)
     return eval_metrics, test_metrics
 
 
@@ -332,19 +321,34 @@ if __name__ == "__main__":
     # Parse the command line arguments
     args = parser.parse_args()
 
-    best_param_list = {
-            'CodeBERT_f1_CE' : {'classifier_factor': 34.94246723772737, 'classifier_learning_rate': 0.0017927138387849317, 'gradient_accumulation_steps': 3, 'weight_decay': 6.454508964040091e-06},
-            'CodeBERT_f1_FL' : {'classifier_factor': 2280.8159631117906, 'classifier_learning_rate': 0.0015535525413118611, 'gradient_accumulation_steps': 11, 'weight_decay': 2.2234216113796252e-05},
-            'CodeBERT_f1_default' : {'classifier_factor': 266.17153286365345, 'classifier_learning_rate': 0.02200212018021276, 'gradient_accumulation_steps': 15, 'weight_decay': 0.003626836244245249},
-            'CodeBERT_f1_descendants' : {'classifier_factor': 54.76190023283356, 'classifier_learning_rate': 0.004381293858999816, 'gradient_accumulation_steps': 5, 'weight_decay': 8.278245967594842e-07},
-            'CodeBERT_f1_equalize' : {'classifier_factor': 97.59949745245396, 'classifier_learning_rate': 0.005554065824714457, 'gradient_accumulation_steps': 6, 'weight_decay': 2.5202696599052906e-06},
-            'CodeBERT_f1_reachable_leaf_nodes' : {'classifier_factor': 10.806340018446154, 'classifier_learning_rate': 0.0007246674413583892, 'gradient_accumulation_steps': 6, 'weight_decay': 0.0043604377153541275},
-            'GraphCodeBERT_f1_CE' : {'classifier_factor': 2882.7636497970248, 'classifier_learning_rate': 0.023534887586838086, 'gradient_accumulation_steps': 12, 'weight_decay': 0.00011858663365272635},
-            'GraphCodeBERT_f1_FL' : {'classifier_factor': 336.0942558351993, 'classifier_learning_rate': 0.00021251559230631167, 'gradient_accumulation_steps': 14, 'weight_decay': 0.0012492551544287034},
-            'GraphCodeBERT_f1_default' : {'classifier_factor': 178.0362273342037, 'classifier_learning_rate': 0.043754045426472966, 'gradient_accumulation_steps': 9, 'weight_decay': 0.004010866671382049},
-            'GraphCodeBERT_f1_descendants' : {'classifier_factor': 18.727675781311266, 'classifier_learning_rate': 0.0024124400100608997, 'gradient_accumulation_steps': 8, 'weight_decay': 9.983911692069648e-06},
-            'GraphCodeBERT_f1_equalize' : {'classifier_factor': 89.62777631781793, 'classifier_learning_rate': 0.02144583168806502, 'gradient_accumulation_steps': 8, 'weight_decay': 0.0020665950258442955},
-            'GraphCodeBERT_f1_reachable_leaf_nodes' : {'classifier_factor': 10.521534053425437, 'classifier_learning_rate': 0.0019196258516080554, 'gradient_accumulation_steps': 6, 'weight_decay': 5.226626789312232e-07},
+    # best_param_list = {
+    #         'CodeBERT_f1_CE' : {'classifier_factor': 34.94246723772737, 'classifier_learning_rate': 0.0017927138387849317, 'gradient_accumulation_steps': 3, 'weight_decay': 6.454508964040091e-06},
+    #         'CodeBERT_f1_FL' : {'classifier_factor': 2280.8159631117906, 'classifier_learning_rate': 0.0015535525413118611, 'gradient_accumulation_steps': 11, 'weight_decay': 2.2234216113796252e-05},
+    #         'CodeBERT_f1_default' : {'classifier_factor': 266.17153286365345, 'classifier_learning_rate': 0.02200212018021276, 'gradient_accumulation_steps': 15, 'weight_decay': 0.003626836244245249},
+    #         'CodeBERT_f1_descendants' : {'classifier_factor': 54.76190023283356, 'classifier_learning_rate': 0.004381293858999816, 'gradient_accumulation_steps': 5, 'weight_decay': 8.278245967594842e-07},
+    #         'CodeBERT_f1_equalize' : {'classifier_factor': 97.59949745245396, 'classifier_learning_rate': 0.005554065824714457, 'gradient_accumulation_steps': 6, 'weight_decay': 2.5202696599052906e-06},
+    #         'CodeBERT_f1_reachable_leaf_nodes' : {'classifier_factor': 10.806340018446154, 'classifier_learning_rate': 0.0007246674413583892, 'gradient_accumulation_steps': 6, 'weight_decay': 0.0043604377153541275},
+    #         'GraphCodeBERT_f1_CE' : {'classifier_factor': 2882.7636497970248, 'classifier_learning_rate': 0.023534887586838086, 'gradient_accumulation_steps': 12, 'weight_decay': 0.00011858663365272635},
+    #         'GraphCodeBERT_f1_FL' : {'classifier_factor': 336.0942558351993, 'classifier_learning_rate': 0.00021251559230631167, 'gradient_accumulation_steps': 14, 'weight_decay': 0.0012492551544287034},
+    #         'GraphCodeBERT_f1_default' : {'classifier_factor': 178.0362273342037, 'classifier_learning_rate': 0.043754045426472966, 'gradient_accumulation_steps': 9, 'weight_decay': 0.004010866671382049},
+    #         'GraphCodeBERT_f1_descendants' : {'classifier_factor': 18.727675781311266, 'classifier_learning_rate': 0.0024124400100608997, 'gradient_accumulation_steps': 8, 'weight_decay': 9.983911692069648e-06},
+    #         'GraphCodeBERT_f1_equalize' : {'classifier_factor': 89.62777631781793, 'classifier_learning_rate': 0.02144583168806502, 'gradient_accumulation_steps': 8, 'weight_decay': 0.0020665950258442955},
+    #         'GraphCodeBERT_f1_reachable_leaf_nodes' : {'classifier_factor': 10.521534053425437, 'classifier_learning_rate': 0.0019196258516080554, 'gradient_accumulation_steps': 6, 'weight_decay': 5.226626789312232e-07},
+    #     }
+    best_param_list =  {
+            'CodeBERT+BiLSTM_f1_CE' : {'BiLSTM_learning_rate': 0.034008690972232435, 'classifier_factor': 139.68095332275686, 'classifier_learning_rate': 0.01160917664931142, 'gradient_accumulation_steps': 2, 'weight_decay': 9.020412876278314e-06},
+            'CodeBERT+BiLSTM_f1_FL' : {'BiLSTM_learning_rate': 0.000318572916799483, 'classifier_factor': 24.575571392567063, 'classifier_learning_rate': 0.00029183324213769403, 'gradient_accumulation_steps': 6, 'weight_decay': 1.59631343579501e-05},
+            'CodeBERT+BiLSTM_f1_default' : {'BiLSTM_learning_rate': 1.279877085591794e-05, 'classifier_factor': 80.72263084661715, 'classifier_learning_rate': 0.013402752552511171, 'gradient_accumulation_steps': 3, 'weight_decay': 7.925932464857802e-05},
+            'CodeBERT+BiLSTM_f1_descendants' : {'BiLSTM_learning_rate': 0.0003970326603219823, 'classifier_factor': 338.87758137094085, 'classifier_learning_rate': 0.05069880896411844, 'gradient_accumulation_steps': 7, 'weight_decay': 4.2414186104451807e-05},
+            'CodeBERT+BiLSTM_f1_equalize' : {'BiLSTM_learning_rate': 0.0003220877921377328, 'classifier_factor': 850.7065378882156, 'classifier_learning_rate': 0.04929124236218869, 'gradient_accumulation_steps': 3, 'weight_decay': 9.238151344811795e-06},
+            'CodeBERT+BiLSTM_f1_reachable_leaf_nodes' : {'BiLSTM_learning_rate': 8.17950823933379e-05, 'classifier_factor': 29.262907091908694, 'classifier_learning_rate': 0.006060646821315373, 'gradient_accumulation_steps': 5, 'weight_decay': 8.955364128624764e-06},
+            'GraphCodeBERT+BiLSTM_f1_CE' : {'BiLSTM_learning_rate': 1.3660252213946701e-05, 'classifier_factor': 665.2802919644846, 'classifier_learning_rate': 0.0007258867242144063, 'gradient_accumulation_steps': 2, 'weight_decay': 1.0449154163675762e-05},
+            'GraphCodeBERT+BiLSTM_f1_FL' : {'BiLSTM_learning_rate': 0.007354054646214738, 'classifier_factor': 93.78208233336159, 'classifier_learning_rate': 5.53498593117409e-05, 'gradient_accumulation_steps': 8, 'weight_decay': 4.5844220046049055e-06},
+            'GraphCodeBERT+BiLSTM_f1_default' : {'BiLSTM_learning_rate': 0.00022919638718472263, 'classifier_factor': 1139.6003923638746, 'classifier_learning_rate': 0.05434920715623826, 'gradient_accumulation_steps': 1, 'weight_decay': 8.458353951755318e-06},
+            'GraphCodeBERT+BiLSTM_f1_descendants' : {'BiLSTM_learning_rate': 0.00018875583923956264, 'classifier_factor': 99.50070477528486, 'classifier_learning_rate': 0.016943619592600573, 'gradient_accumulation_steps': 10, 'weight_decay': 0.0001161442879113915},
+            'GraphCodeBERT+BiLSTM_f1_equalize' : {'BiLSTM_learning_rate': 1.3549235554413088e-05, 'classifier_factor': 199.31269483865094, 'classifier_learning_rate': 0.04752125242604547, 'gradient_accumulation_steps': 13, 'weight_decay': 1.781595238815297e-06},
+            'GraphCodeBERT+BiLSTM_f1_reachable_leaf_nodes' : {'BiLSTM_learning_rate': 7.770294742008388e-05, 'classifier_factor': 179.26622057119513, 'classifier_learning_rate': 0.01998194431093307, 'gradient_accumulation_steps': 3, 'weight_decay': 2.2905786363408954e-07},
+
         }
     args.study_name = f"{args.study_name}_{args.eval_metric}"
     if args.debug_mode:

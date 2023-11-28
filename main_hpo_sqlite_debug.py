@@ -102,7 +102,6 @@ def objective(trial, args):
     df = pd.read_csv('datasets_/combined_dataset.csv')
     class_weights = get_class_weight(df,target_to_dimension)
 
-    # Check if a GPU is available and use it, otherwise, use CPU
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
  
     model, tokenizer = get_model_and_tokenizer(args, prediction_target_uids, graph)
@@ -294,7 +293,7 @@ if __name__ == "__main__":
     parser.add_argument('--model-name', type=str, default='bert-base-uncased', help='Name of the model to use')
     parser.add_argument('--num-trials', type=int, default=1, help='Number of trials for Optuna')
     parser.add_argument('--use-bilstm', action='store_true', help='Flag for BiLSTM with Transformer Model')
-    parser.add_argument('--use-weight-sampling', action='store_true', help='Flag for using weight sampling')
+    # parser.add_argument('--use-weight-sampling', action='store_true', help='Flag for using weight sampling')
     parser.add_argument('--use-hierarchical-classifier', action='store_true', help='Flag for hierarchical classification') #--use-hierarchical-classifier --> true
     parser.add_argument('--use-tuning-last-layer', action='store_true', help='Flag for only fine-tuning pooler layer among base model layers')
     parser.add_argument('--use-tuning-classifier', action='store_true', help='Flag for only fine-tuning classifier')
@@ -389,4 +388,4 @@ if __name__ == "__main__":
     print("Study statistics: ")
     print("  Number of finished trials: ", len(study.trials))
     print("  Number of pruned trials: ", len(pruned_trials))
-    print("  Number of complete trials: ", len(complete_trials))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
+    print("  Number of complete trials: ", len(complete_trials))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  

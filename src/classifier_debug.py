@@ -39,7 +39,7 @@ class TransformerWithHierarchicalClassifier(nn.Module):
         self.model = AutoModel.from_pretrained(self.model_name)
         self.lstm_hidden_dim = 256
         self.input_dim= self.lstm_hidden_dim*2 if self.use_bilstm  else self.embedding_dim
-        print("self.input_dim",self.input_dim)
+        # print("self.input_dim",self.input_dim)
         if self.use_bilstm:
             
             self.bilstm =  torch.nn.LSTM(input_size=self.embedding_dim, 
@@ -343,7 +343,7 @@ class TransformerWithHierarchicalClassifier(nn.Module):
 class HierarchicalClassifier(nn.Module):
     def __init__(self, input_dim=768, output_dim=None, graph=None):
         super(HierarchicalClassifier, self).__init__()
-        print("input_dim",input_dim,"output_dim",output_dim)
+        # print("input_dim",input_dim,"output_dim",output_dim)
         self.linear = nn.Linear(input_dim, output_dim)
         self.sigmoid = nn.Sigmoid() # Sigmoid activation layer
         self._l2_regularization_coefficient = 5e-5
@@ -352,7 +352,7 @@ class HierarchicalClassifier(nn.Module):
         # nn.init.normal_(self.linear.weight, mean=0.0, std=1.0)
         nn.init.zeros_(self.linear.weight) # initialize to 0 --> ask..? with not 0?
         nn.init.zeros_(self.linear.bias) 
-        print("self.linear.weight",self.linear.weight.shape,"self.linear.bias", self.linear.bias.shape )
+        # print("self.linear.weight",self.linear.weight.shape,"self.linear.bias", self.linear.bias.shape )
         
     def forward(self, x):
         x = self.linear(x)  # Linear transformation
