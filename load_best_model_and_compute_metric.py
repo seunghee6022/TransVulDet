@@ -216,7 +216,7 @@ if __name__ == "__main__":
     
     def compute_metrics(predictions, labels):
         print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
-        print("Initial argmax idex prediction", predictions[:10], "target_to_dimension", target_to_dimension)
+        print("Initial argmax idx prediction", predictions[:10], "target_to_dimension", target_to_dimension)
         
         # print("[compute_metrics]p.label_ids before mapping_cwe_to_target_label", p.label_ids)
         labels = mapping_cwe_to_target_label(labels, target_to_dimension)
@@ -327,6 +327,8 @@ if __name__ == "__main__":
         test_dataset = vulDataset(tokenized_test_data,labels)
         test_loader = DataLoader(test_dataset, batch_size=32)
     
+        print("args.use_hierarchical_classifier",args.use_hierarchical_classifier, "args.use_focal_loss",args.use_focal_loss)
+                    
         model.eval()
         prediction_list = []
         with torch.no_grad():
@@ -336,7 +338,9 @@ if __name__ == "__main__":
                 if not args.use_hierarchical_classifier:
                     logits = logits.logits
                     logits = softmax(logits, dim=1)
+                    print("logits", logits.shape)
                     predicted_labels = torch.argmax(logits, dim=1)
+                    print("predicted_labels",predicted_labels)
                 else:
                     predicted_labels = logits
                 
@@ -348,7 +352,7 @@ if __name__ == "__main__":
     # print("@@@@@@@@@@@@@@@ Best Model with Best Acc:")
     # eval(acc_model)
     print("@@@@@@@@@@@@@@@ Best Model with Best macro_f1:")
-    # eval(model, tokenizer, args)
+    eval(model, tokenizer, args)
     # Walk through the output folder
     
     def get_checkpoint_folders(output_folder, metric_list):
@@ -380,8 +384,10 @@ if __name__ == "__main__":
                         'metrics':[],}
                 for root, dirs, files in os.walk(output_folder):
                     for dir_name in dirs:
+                        print(f"dir_name:{dir_name}\nargs:{args}")
                         # Check if directory name contains 'CodeBERT' and 'default'
                         if model_name == dir_name[:len(model_name)] and loss_type in dir_name:
+                            print("model_name == dir_name[:len(model_name)] and loss_type in dir_name",model_name == dir_name[:len(model_name)] , loss_type in dir_name)
                             full_path = os.path.join(root, dir_name)
                             args.checkpoint_dir = full_path
                             model, tokenizer = find_best_checkpoint_by_macro_f1(args)
@@ -393,5 +399,5 @@ if __name__ == "__main__":
 
     metric_list = {}
     output_folder = './outputs'
-    get_checkpoint_folders(output_folder, metric_list)
-            
+    # get_checkpoint_folders(output_folder, metric_list)
+    
