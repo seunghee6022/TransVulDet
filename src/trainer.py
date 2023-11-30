@@ -33,30 +33,22 @@ class CustomTrainer(Trainer):
     
     # For multilabel classification, need to define the Custom Loss Function
     def compute_loss(self, model, inputs, return_outputs=False):
-        # print("THIS IS COMPUTE LOSS IN TRAINER")
         if self.use_hierarchical_classifier:
-            # loss, logits = model(inputs['input_ids'], attention_mask=inputs['attention_mask'], labels=inputs['labels'])
-            # logits = model(inputs['input_ids'], attention_mask=inputs['attention_mask'],position_ids=inputs['position_ids'])
-            # Assuming 'inputs' is a dictionary that includes 'labels' and other necessary inputs for the model
             input_without_labels = {k: v for k, v in inputs.items() if k != 'labels'}
-            # Pass this new dictionary to the model
             logits = model(**input_without_labels)
             loss = model.loss(logits, inputs['labels'])
-            # print("logits, inputs['labels']", logits.shape,  inputs['labels'].shape)
+            
         
         else:
-            # logits = model(inputs['input_ids'], attention_mask=inputs['attention_mask'],position_ids=inputs['position_ids'])
             input_without_labels = {k: v for k, v in inputs.items() if k != 'labels'}
-            # Pass this new dictionary to the model
             logits = model(**input_without_labels)
             if not self.use_bilstm :
                 logits = logits.logits #[batch_size, sequence_length, num_classes] logits, inputs['labels'] torch.Size([6, 21]) torch.Size([6])
             
-            # print("logits", logits)
             # Apply softmax to logits to get probabilities
             logits = F.softmax(logits, dim=-1).cpu()
             labels = self.mapping_cwe_to_label(inputs['labels'].cpu())
-            # print("logits, inputs['labels']", logits.shape,  inputs['labels'].shape)
+
             if self.use_focal_loss:
                 gamma = 2.0
                 self.loss_fn = FocalLoss(gamma=gamma, weights=self.class_weights.cpu()) #https://pypi.org/project/focal-loss-torch/

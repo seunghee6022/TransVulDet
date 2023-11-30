@@ -11,10 +11,10 @@ import json
 from transformers import TrainingArguments
 import matplotlib.pyplot as plt
 
-from src.trainer_debug import CustomTrainer
+from src.trainer import CustomTrainer
 # from src.dataset import CodeDataset, split_dataframe
 from src.graph import create_graph_from_json
-from src.classifier_debug import get_model_and_tokenizer
+from src.classifier import get_model_and_tokenizer
 from src.callback import EarlyStoppingCallback, WandbCallback, OptunaPruningCallback
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, balanced_accuracy_score
 import optuna
@@ -41,15 +41,10 @@ def set_seed(args):
         torch.cuda.manual_seed_all(args.seed)
 
 def map_predictions_to_target_labels(predictions, target_to_dimension):
-    # print("predictions",predictions.shape)
     pred_labels = []
-    # print("predictions",len(predictions),predictions)
     for pred in predictions:
-        # Find the index of the max softmax probability
         softmax_idx = np.argmax(pred)
-        # print(softmax_idx)
         cwe_id = list(target_to_dimension.keys())[softmax_idx]
-        # print("softmax_idx:",softmax_idx, "pred:",pred, "cwe_id",cwe_id)
         if cwe_id not in list(target_to_dimension.keys()):
             print(f"cwe_id:{cwe_id} is NOT in target_to_dimension!!!!!")
         cwe_target_idx = target_to_dimension[cwe_id]
@@ -58,25 +53,21 @@ def map_predictions_to_target_labels(predictions, target_to_dimension):
     return pred_labels
 
 def mapping_cwe_to_target_label(cwe_label, target_to_dimension):
-        # Convert each tensor element to its corresponding dictionary value
         mapped_labels = [target_to_dimension[int(cwe_id)] for cwe_id in cwe_label]
         return mapped_labels
 
 def get_class_weight(df,target_to_dimension):
     cwe_list = df['assignedclass'].tolist()
     idx_classes = [target_to_dimension[int(cwe_id)] for cwe_id in cwe_list]
-    class_counts = np.bincount(idx_classes, minlength=len(target_to_dimension))  # Ensure 'minlength' covers all your classes
-    # Calculate class weights (inverse of the frequency)
+    class_counts = np.bincount(idx_classes, minlength=len(target_to_dimension))  # Ensure 'minlength' covers all classes
+    # Calculate class weights (inverse class frequency)
     weights = 1. / class_counts
     weights = weights / weights.sum()  # Normalize to make the sum of weights equal to 1
     weights[class_counts == 0] = 0  # Set weight to 0 if class count is 0
     class_weights = torch.FloatTensor(weights)
     return class_weights
 
-# Objective function for Optuna
 def objective(trial, args):
-
-    # Suggest hyperparameters
     lr = trial.suggest_float("classifier_learning_rate", 1e-5, 1e-1, log=True)
     classifier_factor = trial.suggest_float("classifier_factor", 1e1, 1e5, log=True)
     weight_decay = trial.suggest_float("weight_decay", 1e-7, 1e-2, log=True)
@@ -89,15 +80,12 @@ def objective(trial, args):
    
     # actual targets to be predicted
     prediction_target_uids = [int(key) for key in paths_dict_data.keys()] # 204
-    # print("prediction_target_uids",prediction_target_uids)
     target_to_dimension = {target:idx for idx,target in enumerate(prediction_target_uids)}
-    # print("target_to_dimension", target_to_dimension)
     graph = create_graph_from_json(paths_dict_data, max_depth=None)
 
     # Define Tokenizer and Model
     num_labels = graph.number_of_nodes() 
-    # print(f"num_all_nodes:{num_labels} num_target_labels: {len(target_to_dimension)}")
-   
+
     # define class weights for focal loss
     df = pd.read_csv('datasets_/combined_dataset.csv')
     class_weights = get_class_weight(df,target_to_dimension)
@@ -107,12 +95,11 @@ def objective(trial, args):
     model, tokenizer = get_model_and_tokenizer(args, prediction_target_uids, graph)
     wandb.watch(model)
 
-    # print(model)
-    # Freeze all parameters of the model
+    # unfreeze all parameters of the model
     for param in model.parameters():
         param.requires_grad = True
 
-    # Unfreeze the classifier head: to fine-tune only the classifier head
+    # Unfreeze the classifier head
     for param in model.classifier.parameters():
         param.requires_grad = True
 
@@ -120,9 +107,7 @@ def objective(trial, args):
 
     # Function to tokenize on the fly
     def encode(example):
-        # tokenized_inputs = tokenizer(example['code'], truncation=True, padding=True, max_length=args.max_length,return_tensors="pt").to(device)
         tokenized_inputs = tokenizer(example['code'], truncation=True, padding=True, max_length=args.max_length, return_tensors="pt")
-        # tokenized_inputs['labels'] = one_hot_encode(example['assignedclass'])
         tokenized_inputs['labels'] = example['assignedclass']
         return tokenized_inputs
 
@@ -145,28 +130,20 @@ def objective(trial, args):
     print("TRAIN/VAL/TEST SET LENGTHS:",len(train_dataset), len(val_dataset), len(test_dataset))
 
     def compute_metrics(p):
-        print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
 
         predictions, labels = p.predictions, p.label_ids
-        # print("[compute_metrics]p.label_ids before mapping_cwe_to_target_label", p.label_ids)
         labels = mapping_cwe_to_target_label(labels, target_to_dimension)
-        print("[compute_metrics] @@@@@@@ labels [:30]", labels[:30])
         
         if args.use_hierarchical_classifier:
             pred_dist = model.deembed_dist(predictions) # get probabilities of each nodes
-            # print("[if args.use_hierarchical_classifier]pred_dist",pred_dist)
             pred_cwe_labels = model.dist_to_cwe_ids(pred_dist)
-            # print("[if args.use_hierarchical_classifier]pred_cwe_labels",pred_cwe_labels)
             pred_labels = mapping_cwe_to_target_label(pred_cwe_labels, target_to_dimension)
-            print(f"[Hierarchical Classifier]Unique value: {len(set(pred_labels))} @@@@@@@ pred_labels[:30]:{pred_labels[:30]}")
+            
         else:
-            # print("predictions", len(predictions), predictions)
             pred_labels = map_predictions_to_target_labels(predictions, target_to_dimension)
-            print(f"[Normal Classifiacation]{len(set(pred_labels))} @@@@@@@ pred_labels[:30]:{pred_labels[:30]}")
+        
         predictions = pred_labels
 
-        # print(f"predictions:{len(predictions)}{predictions}")
-        # print(f"labels: {len(labels)}{labels}")
         precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average=args.eval_metric_average, zero_division=0.0, labels=list(target_to_dimension.values()))
         acc = accuracy_score(labels, predictions)
         balanced_acc = balanced_accuracy_score(labels, predictions)
@@ -212,26 +189,8 @@ def objective(trial, args):
         "betas": (training_args.adam_beta1, training_args.adam_beta2),
         "eps": training_args.adam_epsilon,
     }
-
     
-
-    '''
-    1. classifier
-    2. pre-trained model + classifier
-    3. last encoder output layer + classifier
-
-    HC --> custom classifier
-
-    12th output layer
-    pooler
-    classifier
-
-    classification model
-    12th output layer
-    default classifier
-
-    '''
-    
+    # define different learning rate for pre-trained model and classifier
     base_lr = lr/classifier_factor
     if args.debug_mode:
         optimizer = AdamW(model.parameters(), lr=2e-5)
@@ -239,7 +198,6 @@ def objective(trial, args):
     else:
         classifier_params = list(model.classifier.parameters())
         base_params_names = [n for n, p in model.named_parameters() if 'classifier' not in n]
-        # print(base_params_names)
         base_params = [p for n, p in model.named_parameters() if 'classifier' not in n] 
         if args.use_bilstm:
             bilstm_params = list(model.bilstm.parameters())
@@ -264,7 +222,6 @@ def objective(trial, args):
         tokenizer=tokenizer,
         optimizers=(optimizer, None),
         callbacks=[OptunaPruningCallback(trial=trial, args=args),WandbCallback],  
-        # callbacks=[EarlyStoppingCallback(patience=5, threshold=0),WandbCallback],
     )
 
     # Train and evaluate the model
@@ -280,11 +237,8 @@ def objective(trial, args):
 if __name__ == "__main__":
     torch.cuda.empty_cache()
 
-    # Create an ArgumentParser object
     parser = argparse.ArgumentParser(description="Hyperparameter optimization using Optuna")
 
-    # Add arguments
-    # parser.add_argument('--data-dir', type=str, default='datasets_', help='Path to the dataset directory')
     parser.add_argument('--node-paths-dir', type=str, default='data_preprocessing/preprocessed_datasets/debug_datasets/graph_assignedcwe_paths.json', help='Path to the dataset directory')
     parser.add_argument('--train-data-dir', type=str, default='datasets_/train_dataset.csv', help='Path to the train dataset directory')
     parser.add_argument('--val-data-dir', type=str, default='datasets_/balanced_validation_dataset.csv', help='Path to the val dataset directory')
@@ -293,7 +247,6 @@ if __name__ == "__main__":
     parser.add_argument('--model-name', type=str, default='bert-base-uncased', help='Name of the model to use')
     parser.add_argument('--num-trials', type=int, default=1, help='Number of trials for Optuna')
     parser.add_argument('--use-bilstm', action='store_true', help='Flag for BiLSTM with Transformer Model')
-    # parser.add_argument('--use-weight-sampling', action='store_true', help='Flag for using weight sampling')
     parser.add_argument('--use-hierarchical-classifier', action='store_true', help='Flag for hierarchical classification') #--use-hierarchical-classifier --> true
     parser.add_argument('--use-tuning-last-layer', action='store_true', help='Flag for only fine-tuning pooler layer among base model layers')
     parser.add_argument('--use-tuning-classifier', action='store_true', help='Flag for only fine-tuning classifier')
@@ -311,7 +264,6 @@ if __name__ == "__main__":
     parser.add_argument('--eval-metric', type=str, default='f1', help='Evaluation metric')
     parser.add_argument('--eval-metric-average', type=str, default='macro', help='Evaluation metric average')
 
-    # Parse the command line arguments
     args = parser.parse_args()
 
     args.study_name = f"{args.study_name}_{args.eval_metric}"
@@ -342,11 +294,6 @@ if __name__ == "__main__":
         raise ValueError(f"--eval-samples {args.eval_samples} is not divisible by 32")
 
     args.study_name = f"{args.study_name}_max_evals{args.max_evals}_samples{args.eval_samples}"
-    
-    # define class weights for focal loss
-    # df = pd.read_csv('datasets_/combined_dataset.csv')
-    # args.class_weights = get_class_weight(df)
-    # print(args.class_weights)
 
     print("MAIN - args",args)
 

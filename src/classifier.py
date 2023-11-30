@@ -18,9 +18,6 @@ def get_model_and_tokenizer(args, prediction_target_uids,graph):
         model = AutoModelForSequenceClassification.from_pretrained(args.model_name, num_labels=len(prediction_target_uids))
     return model, tokenizer
 
-# class TransformerWithHierarchicalClassifier(PreTrainedModel):
-#     def __init__(self, model_name, prediction_target_uids, graph, use_bilstm, use_hierarchical_classifier, _weighting='equalize',embedding_dim=768, config=None):
-#         super(TransformerWithHierarchicalClassifier, self).__init__(config)
 class TransformerWithHierarchicalClassifier(nn.Module):
     def __init__(self, model_name, prediction_target_uids, graph, use_bilstm, use_hierarchical_classifier, _weighting='equalize',embedding_dim=768):
         super(TransformerWithHierarchicalClassifier, self).__init__()
@@ -40,7 +37,7 @@ class TransformerWithHierarchicalClassifier(nn.Module):
         self.model = AutoModel.from_pretrained(self.model_name)
         self.lstm_hidden_dim = 256
         self.input_dim= self.lstm_hidden_dim*2 if self.use_bilstm  else self.embedding_dim
-        # print("self.input_dim",self.input_dim)
+
         if self.use_bilstm:
             
             self.bilstm =  torch.nn.LSTM(input_size=self.embedding_dim, 
@@ -55,7 +52,6 @@ class TransformerWithHierarchicalClassifier(nn.Module):
         
         
         self.classifier = HierarchicalClassifier(self.input_dim, len(self.uid_to_dimension), self.graph)
-        # print(f"self.uid_to_dimension:{self.uid_to_dimension}\nself.topo_sorted_uids:{self.topo_sorted_uids}")
         self._weighting = _weighting
         self.loss_weights = np.ones(len(self.uid_to_dimension))
         self.get_loss_weight()
@@ -80,8 +76,7 @@ class TransformerWithHierarchicalClassifier(nn.Module):
                 occurences[affected_uid] += 1
 
         occurrence_vector = np.array([occurences[uid] for uid in self.uid_to_dimension])
-        # print(f"{occurrence_vector}:occurrence_vector")
-
+    
         # (2) Calculate weight vector
         if self._weighting == "default":
             self.loss_weights = np.ones(len(self.uid_to_dimension))
@@ -141,10 +136,8 @@ class TransformerWithHierarchicalClassifier(nn.Module):
                 )
                 raise err
         self.loss_weights = torch.tensor(self.loss_weights, dtype=torch.float32)
-        # print(f"self._weighting == {self._weighting} --> self.loss_weights = {self.loss_weights}")
-
+       
     def forward(self, input_ids, attention_mask=None,  labels=None, **kwargs):
-        # print("INSIDE TransforerWithHierarchicalClassifier Forward")
         outputs = self.model(
             input_ids,
             attention_mask=attention_mask,
@@ -152,28 +145,18 @@ class TransformerWithHierarchicalClassifier(nn.Module):
         )
         labels=None
         last_hidden_state = outputs.last_hidden_state  # Shape: (batch_size, sequence_length, hidden_size)
-        # print("last_hidden_state", last_hidden_state.shape)
         if self.use_bilstm:
-            # last_hidden_state = last_hidden_state.permute(1, 2, 0)  # New shape will be [512, 768, 32]
-            # print("permute last_hidden_state", last_hidden_state.shape)
-            # print("use_bilstm!!!!")
             lstm_out, _ = self.bilstm(last_hidden_state)
-            # print("[forward] lstm_out",lstm_out.shape)
             lstm_out = lstm_out[:, -1, :]
-            # print("[forward] lstm_out[:, -1, :]", lstm_out.shape,lstm_out)
             if self.use_hierarchical_classifier:
                 logits = self.classifier(lstm_out)
-                # print("[forward - HC + LSTM] logits", logits.shape)
+                
             else:
                 logits = self.fc(lstm_out)
-                
-                # prob = self.softmax(logits)
-                # print("[forward - HC] logits", logits.shape)
+
         else:
-            cls_output = last_hidden_state[:, 0, :] # Take the representation of [CLS] token - [batch_size, tokens, hidden_dim] CLS token is the first token of last hidden state
-            # print("cls_output = last_hidden_state[:, 0, :] ", cls_output.shape)
+            cls_output = last_hidden_state[:, 0, :]
             logits = self.classifier(cls_output)
-            # print("[forward NC] logits", logits.shape)
         
         if labels is not None:
             loss = self.loss(logits, labels)
@@ -198,13 +181,11 @@ class TransformerWithHierarchicalClassifier(nn.Module):
     
     
     def loss(self, logits, targets, weight_batch=None, global_step=None):
-        # print("[loss]logits",logits.shape)
         '''
         ground_truth should be cwe id values. Given ground_truth is one-hot-encoded so needed to be converted to cwe_id list
         '''
         targets = targets.tolist()
-        # print("[ HC Loss ]targets",targets)
-    
+       
         # If weight_batch is not provided, use a tensor of ones with the same shape as logits
         if weight_batch is None:
             weight_batch = torch.ones_like(logits[:, 0])
@@ -234,21 +215,17 @@ class TransformerWithHierarchicalClassifier(nn.Module):
         # print("loss_mask", loss_mask)
 
         embedding = self.embed(targets)
-        # print(f"embedding {embedding.shape} {embedding}")
         prediction = logits # batch*size, len(uid_to_dimension) : 32*32
-        # print(f"[Loss function in HC classifier]Prediction = logits {logits.shape} {logits}")
-        
+      
         # Clipping predictions for stability
         clipped_probs = torch.clamp(prediction, 1e-7, 1.0 - 1e-7)
-        # print("prediction",prediction)
-
+        
         # debug
         embedding = embedding.to(self.device)
         clipped_probs = clipped_probs.to(self.device)
         loss_mask = loss_mask.to(self.device)
         self.loss_weights = self.loss_weights.to(self.device)
-        # print("embedding",embedding.shape, "clipped_probs", clipped_probs.shape,"loss_mask", loss_mask.shape,"self.loss_weights", self.loss_weights )
-       
+        
         # Binary cross entropy loss calculation
         the_loss = -(
             embedding * torch.log(clipped_probs) +
@@ -262,16 +239,13 @@ class TransformerWithHierarchicalClassifier(nn.Module):
         # This is L2 regularization term
         l2_penalty = self.classifier.l2_penalty()
         total_loss = torch.mean(sum_per_batch_element * weight_batch) + l2_penalty
-        # print("INSIDE BertWithHierarchicalClassifier -- the_loss",the_loss,"sum_per_batch_element", sum_per_batch_element,"total_loss",total_loss)
-        # print("INSIDE BertWithHierarchicalClassifier ---- INSIDE loss function------total_loss--------",total_loss)
         return total_loss
     
     def _deembed_single(self, embedded_label):
         conditional_probabilities = {
             uid: embedded_label[i] for uid, i in self.uid_to_dimension.items()
         }
-        # print(f"conditional_probabilities:\n {conditional_probabilities}")
-     
+        
         # Stage 1 calculates the unconditional probabilities
         unconditional_probabilities = {}
 
@@ -288,7 +262,6 @@ class TransformerWithHierarchicalClassifier(nn.Module):
                 unconditional_probability *= 1.0 - no_parent_probability
 
             unconditional_probabilities[uid] = unconditional_probability
-        # print(f"unconditional_probabilities:\n {unconditional_probabilities}")
 
         # Stage 2 calculates the joint probability of the synset and "no children"
         joint_probabilities = {}
@@ -299,17 +272,16 @@ class TransformerWithHierarchicalClassifier(nn.Module):
                 no_child_probability *= 1.0 - unconditional_probabilities[child]
 
             joint_probabilities[uid] = joint_probability * no_child_probability
-        # print(f"joint_probabilities:\n {joint_probabilities}")
+        
         tuples = joint_probabilities.items()
         sorted_tuples = list(sorted(tuples, key=lambda tup: tup[1], reverse=True))
-        # print(f"sorted_tuples:\n {sorted_tuples}")
-
+        
         # If requested, only output scores for the forced prediction targets
         if self._force_prediction_targets:
             for i, (uid, p) in enumerate(sorted_tuples):
                 if uid not in self.prediction_target_uids:
                     sorted_tuples[i] = (uid, 0.0)
-            # print(f"sorted_tuples:\n{sorted_tuples}")
+            
             total_scores = sum([p for uid, p in sorted_tuples])
             if total_scores > 0:
                 sorted_tuples = [
@@ -319,7 +291,6 @@ class TransformerWithHierarchicalClassifier(nn.Module):
             return list(sorted_tuples)
         
     def deembed_dist(self, embedded_labels):
-        # print("[deembed_dist]embedded_labels",embedded_labels)
         return [
             self._deembed_single(embedded_label) for embedded_label in embedded_labels
         ]
@@ -328,33 +299,25 @@ class TransformerWithHierarchicalClassifier(nn.Module):
         max_cwe_id_list = []
         for sorted_tuples in pred_dist:
             max_cwe_id = max(sorted_tuples, key=lambda x: x[1])[0]
-            # print(f"[dist_to_cwe_ids] max_cwe_id:{max_cwe_id}")
-            # print(f"self.uid_to_dimension[max_cwe_id]:{self.uid_to_dimension[max_cwe_id]}")
-            # max_index = self.uid_to_dimension[max_cwe_id]
             max_cwe_id_list.append(max_cwe_id)
         return max_cwe_id_list
     
     def dimension_to_cwe_id(self, idx_labels):
         dimension_to_uid = {v:k for k, v in self.uid_to_dimension.items()}
-        # print("dimension_to_uid",dimension_to_uid)
         cwe_id_list = [dimension_to_uid[idx] for idx in idx_labels]
-        # print("[dimension_to_cwe_id]idx_labels",idx_labels)
-        # print("[dimension_to_cwe_id]cwe_id_list",cwe_id_list)
         return cwe_id_list
 
 class HierarchicalClassifier(nn.Module):
     def __init__(self, input_dim=768, output_dim=None, graph=None):
         super(HierarchicalClassifier, self).__init__()
-        # print("input_dim",input_dim,"output_dim",output_dim)
         self.linear = nn.Linear(input_dim, output_dim)
         self.sigmoid = nn.Sigmoid() # Sigmoid activation layer
         self._l2_regularization_coefficient = 5e-5
        
         # Initialize weights and biases to zero
         # nn.init.normal_(self.linear.weight, mean=0.0, std=1.0)
-        nn.init.zeros_(self.linear.weight) # initialize to 0 --> ask..? with not 0?
+        nn.init.zeros_(self.linear.weight) 
         nn.init.zeros_(self.linear.bias) 
-        # print("self.linear.weight",self.linear.weight.shape,"self.linear.bias", self.linear.bias.shape )
         
     def forward(self, x):
         x = self.linear(x)  # Linear transformation
