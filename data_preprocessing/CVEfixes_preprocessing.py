@@ -30,15 +30,6 @@ conn = create_connection(DATA_PATH / "CVEfixes.db")
 cursor = conn.cursor()
 cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
 
-join_query = """
-SELECT cc.cwe_id, mc.code, cc.cve_id
-FROM file_change f
-JOIN fixes fx ON f.hash = fx.hash
-JOIN cve cv ON fx.cve_id = cv.cve_id
-JOIN cwe_classification cc ON cv.cve_id = cc.cve_id
-JOIN method_change mc ON f.file_change_id = mc.file_change_id
-WHERE cc.cwe_id NOT IN ('NVD-CWE-Other', 'NVD-CWE-noinfo')
-"""
 non_vul_query = """
 SELECT cc.cwe_id, mc.code, cc.cve_id
 FROM file_change f, fixes fx, cve cv, cwe_classification cc, method_change mc
@@ -69,23 +60,10 @@ non_exist_cwe_id_list = [16, 17, 18, 19, 21, 189, 199, 254, 255, 264, 275, 310, 
 # Execute the query and fetch data into a DataFrame
 def query_and_preprocess_dataframe(query, vul_flag):
     df = pd.read_sql_query(query, conn)
-
-    print("# of total rows before dropping duplicates: ",df.shape[0])
     df = df.drop_duplicates()
-    print("# of total rows after dropping duplicates: ",df.shape[0])
-
-    for column in df.columns:
-        print(f"Column: {column}")
-        print("Unique values:", df[column].unique())
-        print()
-
-    print("# of total rows: ",df.shape[0])
-    print(df.columns)
-    print(df.head(5))
-
-    nan_count = df['cwe_id'].isnull().sum()
-    print("Number of NaN values in 'cwe_id':", nan_count)
  
+    nan_count = df['cwe_id'].isnull().sum()
+    
     for exception_id in exception_id_list:
         count = len(df[df['cwe_id'] == exception_id])
         print("Count of", exception_id, ":", count)
@@ -111,15 +89,8 @@ def query_and_preprocess_dataframe(query, vul_flag):
         df['cwe_id'] = 0
     
     vul_counts = df['vul'].value_counts()
-
-    print("\nVul counts:")
-    print(vul_counts)
-
     df = df[['code','cwe_id','cve_id','vul']]
-    print("# of total rows: ",df.shape[0])
-    print(df.columns)
-    print(df.head(5))
-
+    
     return df
 
 vul_df = query_and_preprocess_dataframe(vul_query, True)
