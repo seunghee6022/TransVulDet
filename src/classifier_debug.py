@@ -363,3 +363,4 @@ class HierarchicalClassifier(nn.Module):
     
     def l2_penalty(self):
         return self._l2_regularization_coefficient * torch.sum(self.linear.weight ** 2)
+         
