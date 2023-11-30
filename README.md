@@ -12,12 +12,21 @@ TransVulDet is a Transformer-based Language Model for Vulnerability Detection ai
       *  https://drive.google.com/file/d/1-0VhnHBp9IGh90s2wCNjeCMuy70HPl8X/view?usp=sharing
 * CVEfixes Dataset
   * 209 CWEs
+  * The latest version 'CVEfixes_v1.0.7' 
   * https://zenodo.org/record/7029359
+ 
+#### Data Preprocessing & Visualization
+* For MSR dataset,
+  * data_preprocessing/MSR_preprocessing.ipynb
+* For CVEfixes dataset, data collection by sql query and then preprocessing it
+ * download 'CVEfixes_v1.0.7' and put `CVEfixes_preprocessing.py` in CVEfixes_v1.0.7/Examples and execute it. (data_preprocessing/CVEfixes_preprocessing.py)
+    
 
 ### Model
 Pre-trained Transformer-based Language Models
 * CodeBERT
 * GraphCodeBERT
+
 
 ### Experiments
 #### Model Configurations
@@ -30,7 +39,8 @@ Pre-trained Transformer-based Language Models
 
 
 The CodeBERT/GraphCodeBERT with Hierarchical Classifier will be called 'hCodeBERT'/'hGraphCodeBERT' in Result section.
- 
+
+
  
 ### Result
 #### Evaluation Metrics for Binary/Multiclass Classification Tasks
