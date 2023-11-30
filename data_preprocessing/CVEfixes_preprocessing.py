@@ -98,7 +98,7 @@ non_vul_df = query_and_preprocess_dataframe(non_vul_query, False)
 combined_df = pd.concat([vul_df,non_vul_df])
 
 # Save to CSV, rows separated by ""
-combined_df.to_csv('../../TransVulDet/data_preprocessing/CVEfixes/CVEfixes_new_2.csv', index=False, lineterminator="")
+combined_df.to_csv('../../TransVulDet/data_preprocessing/CVEfixes/CVEfixes_new.csv', index=False, lineterminator="")
 
 # Close the connection
 conn.close()
