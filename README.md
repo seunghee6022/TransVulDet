@@ -27,6 +27,8 @@ Pre-trained Transformer-based Language Models
 | GraphCodeBERT                     | Cross Entropy, Focal Loss     | Default, Class Weights                   | Non-Hierarchical    |
 | CodeBERT with Hierarchical Classifier | BCE (per node)              | Default, Equalize, Descendants, Reachable Leaf Nodes | Hierarchical       |
 | GraphCodeBERT with Hierarchical Classifier | BCE (per node)          | Default, Equalize, Descendants, Reachable Leaf Nodes | Hierarchical       |
+
+
 The CodeBERT/GraphCodeBERT with Hierarchical Classifier will be called 'hCodeBERT'/'hGraphCodeBERT' in Result section.
  
  
