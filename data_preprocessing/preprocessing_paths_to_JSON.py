@@ -211,13 +211,6 @@ data_str = """
 1336 - 1000-664-913-914-1336 
 """
 
-# Load datasets
-# cvefixes = pd.read_csv("data_preprocessing/CVEfixes/CVEfixes_new.csv")
-# msr = pd.read_csv("data_preprocessing/Bigvul/MSR.csv")
-# cvefixes_cwe_ids = cvefixes['cwe_id'].dropna()
-# msr_cwe_ids = msr['cwe_id'].dropna()
-# combined_cwe_ids = pd.concat([cvefixes_cwe_ids, msr_cwe_ids])
-
 def preprocess_and_save_path_to_json(df, add_root, col_name, file_name):
  
     combined_cwe_ids = df[col_name].dropna()
@@ -236,7 +229,6 @@ def preprocess_and_save_path_to_json(df, add_root, col_name, file_name):
         parts = line.split(" - ")
         parts = [part.strip() for part in parts]
         if int(parts[0]) not in target_cwe_ids:
-            # print(f"Skipping {int(parts[0])} as it's not in target_cwe_ids.")
             continue
         else:
            print(f"{int(parts[0])} it's in target_cwe_ids.{parts}") 
@@ -258,7 +250,6 @@ def preprocess_and_save_path_to_json(df, add_root, col_name, file_name):
         new_line = parts[0] + " - " + ", ".join(new_sequences)
         new_data_lines.append(new_line)
 
-    # print(f"new_data_lines {len(new_data_lines), new_data_lines}")
     new_data_str = "\n".join(new_data_lines)
 
     # Save it as json file
@@ -268,15 +259,10 @@ def preprocess_and_save_path_to_json(df, add_root, col_name, file_name):
     for line in data_lines:
         if ' - ' in line:  # Check if the separator exists in the line
             key, value = line.split(' - ')
-            print(key, value)
-            # if ', ' in value:
-            #     continue
-            # data_dict[key] = value
             data_dict[key] = value.split(', ')
         else:
             print(f"Skipping line: {line}")
-    print(len(data_dict), data_dict)
-    # # Save the dictionary as a JSON file
+     # Save the dictionary as a JSON file
     with open(f'data_preprocessing/preprocessed_datasets/debug_datasets/{file_name}.json', 'w') as f:
         json.dump(data_dict, f, indent=4)
     print(f"Saved {file_name}.json")
@@ -287,11 +273,9 @@ cvefixes = pd.read_csv("data_preprocessing/CVEfixes/CVEfixes_new.csv")
 msr = pd.read_csv("data_preprocessing/Bigvul/MSR.csv")
 combined_df = pd.concat([cvefixes, msr])
 print(combined_df.nunique())
+
 # The original CWE hierarchy doesn't contain 0 and 10000(new root) class
 original_cwe_df = combined_df[combined_df['cwe_id'] != 0]
-# preprocess_and_save_path_to_json(original_cwe_df, add_root=False, col_name='cwe_id', file_name='graph_original_paths')
-
-# preprocess_and_save_path_to_json(combined_df, add_root=True, col_name='cwe_id', file_name='graph_all_paths')
 combined_df = pd.read_csv("datasets_/combined_dataset.csv")
 print(combined_df.nunique())
 print(combined_df)
