@@ -19,6 +19,27 @@ Pre-trained Transformer-based Language Models
 * CodeBERT
 * GraphCodeBERT
 
-### Evaluation
+### Model Configurations
 
+| Model                             | Loss Function                | Loss Weights                              | Classification Type |
+| --------------------------------- | ---------------------------- | ------------------------------------------ | ------------------- |
+| CodeBERT                          | Cross Entropy, Focal Loss     | Default, Class Weights                   | Non-Hierarchical    |
+| GraphCodeBERT                     | Cross Entropy, Focal Loss     | Default, Class Weights                   | Non-Hierarchical    |
+| CodeBERT with Hierarchical Classifier | BCE (per node)              | Default, Equalize, Descendants, Reachable Leaf Nodes | Hierarchical       |
+| GraphCodeBERT with Hierarchical Classifier | BCE (per node)          | Default, Equalize, Descendants, Reachable Leaf Nodes | Hierarchical       |
+
+
+### Evaluation
+*  run `load_best_model_and_compute_metric.py`for both binary/multiclass classification measures at once
+* Binary Classification Metrcs
+ * Accuracy
+ * Precision
+ * Recall
+ * F1-Score
+* Multiclass Classification Metrics
+  * Accuracy
+  * Balanced Accuracy
+  * Weighted F1-Score
+  * Macro F1-Score
+ 
 ### Result
