@@ -3,7 +3,7 @@
 TransVulDet is a Transformer-based Language Model for Vulnerability Detection aiming to better domain knowledge integration (e.g. CWE hierarchy) with source code datasets.
 
 ### Dataset
-* Big-Vul dataset 
+* Big-Vul dataset (MSR dataset)
   * 91 CWE
   * https://dl.acm.org/doi/10.1145/3379597.3387501
   * https://github.com/ZeoVan/MSR_20_Code_vulnerability_CSV_Dataset
@@ -16,16 +16,16 @@ TransVulDet is a Transformer-based Language Model for Vulnerability Detection ai
   * https://zenodo.org/record/7029359
  
 #### Data Preprocessing & Visualization
-* For MSR dataset,
+* For Big-Vul (MSR) dataset,
   * `data_preprocessing/MSR_preprocessing.ipynb`
 * For CVEfixes dataset, data collection by sql query and then preprocessing it
  * download 'CVEfixes_v1.0.7' and put `CVEfixes_preprocessing.py` in CVEfixes_v1.0.7/Examples and execute it. (data_preprocessing/CVEfixes_preprocessing.py)
-* For combining two dataset and reassign CWE IDs and split them into train/validation/test dataset as well as balanced validation dataset,
+* For combining two dataset and reassign CWE IDs and split them into train_dataset(80%)/validation_dataset(10%)/test_dataset(10%) as well as balanced validation dataset,
   * `data_preprocessing/assign_cwes_and_split_datasets.ipynb`
 * To create Directed Acyclic Graph (DAG) for CWE Hierarchy,
   * `data_preprocessing/preprocessing_paths_to_JSON.py` : convert given cwe node paths to json file
-  * `src/graph.py` : greate/plot the graph (DAG) and save figure 
-    
+  * `src/graph.py` : greate/plot the graph (DAG) and save figure
+
 ### Model
 Pre-trained Transformer-based Language Models
 * CodeBERT
@@ -33,7 +33,7 @@ Pre-trained Transformer-based Language Models
 
 
 ### Experiments
-HPO with `main_hpo_sqlite.py`
+ 
 #### Model Configurations
 | Model                             | Loss Function                | Loss Weights                              | Classification Type |
 | --------------------------------- | ---------------------------- | ------------------------------------------ | ------------------- |
@@ -45,8 +45,15 @@ HPO with `main_hpo_sqlite.py`
 
 The CodeBERT/GraphCodeBERT with Hierarchical Classifier will be called 'hCodeBERT'/'hGraphCodeBERT' in Result section.
 
+#### Hyperparameter Optimization (HPO) 
+run with `main_hpo_sqlite.py`, 
+train with train_dataset.csv, test with test_dataset.cav
+validation with balanced_validation_set and balanced measure (macro f1-score)
+
 ### Fine-tuning
-With `main_train.py`
+run with `main_train.py`
+train with train_dataset.csv, test with test_dataset.cav
+validation with validation_set and normal measure (weighted f1-score)
 
  
 ### Result
