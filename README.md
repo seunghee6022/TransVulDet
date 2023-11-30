@@ -17,11 +17,15 @@ TransVulDet is a Transformer-based Language Model for Vulnerability Detection ai
  
 #### Data Preprocessing & Visualization
 * For MSR dataset,
-  * data_preprocessing/MSR_preprocessing.ipynb
+  * `data_preprocessing/MSR_preprocessing.ipynb`
 * For CVEfixes dataset, data collection by sql query and then preprocessing it
  * download 'CVEfixes_v1.0.7' and put `CVEfixes_preprocessing.py` in CVEfixes_v1.0.7/Examples and execute it. (data_preprocessing/CVEfixes_preprocessing.py)
+* For combining two dataset and reassign CWE IDs and split them into train/validation/test dataset as well as balanced validation dataset,
+  * `data_preprocessing/assign_cwes_and_split_datasets.ipynb`
+* To create Directed Acyclic Graph (DAG) for CWE Hierarchy,
+  * `data_preprocessing/preprocessing_paths_to_JSON.py` : convert given cwe node paths to json file
+  * `src/graph.py` : greate/plot the graph (DAG) and save figure 
     
-
 ### Model
 Pre-trained Transformer-based Language Models
 * CodeBERT
@@ -29,6 +33,7 @@ Pre-trained Transformer-based Language Models
 
 
 ### Experiments
+HPO with `main_hpo_sqlite.py`
 #### Model Configurations
 | Model                             | Loss Function                | Loss Weights                              | Classification Type |
 | --------------------------------- | ---------------------------- | ------------------------------------------ | ------------------- |
@@ -40,6 +45,8 @@ Pre-trained Transformer-based Language Models
 
 The CodeBERT/GraphCodeBERT with Hierarchical Classifier will be called 'hCodeBERT'/'hGraphCodeBERT' in Result section.
 
+### Fine-tuning
+With `main_train.py`
 
  
 ### Result
