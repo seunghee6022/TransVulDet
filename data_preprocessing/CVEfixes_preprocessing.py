@@ -29,7 +29,6 @@ Path(RESULT_PATH).mkdir(parents=True, exist_ok=True)
 conn = create_connection(DATA_PATH / "CVEfixes.db")
 cursor = conn.cursor()
 cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-print(cursor.fetchall())
 
 join_query = """
 SELECT cc.cwe_id, mc.code, cc.cve_id
@@ -47,8 +46,9 @@ WHERE f.hash = fx.hash
 AND fx.cve_id = cv.cve_id 
 AND cv.cve_id = cc.cve_id 
 AND f.file_change_id = mc.file_change_id
-AND mc.before_change is False 
+AND mc.before_change = 'False'
 """
+
 
 vul_query = """
 SELECT cc.cwe_id, mc.code, cc.cve_id
@@ -57,7 +57,8 @@ WHERE f.hash = fx.hash
 AND fx.cve_id = cv.cve_id 
 AND cv.cve_id = cc.cve_id 
 AND f.file_change_id = mc.file_change_id
-AND mc.before_change is True  AND cc.cwe_id not NULL
+AND mc.before_change = 'True'
+AND cc.cwe_id IS NOT NULL
 """
 
 # drop rows based on exception_id_list
@@ -65,16 +66,14 @@ exception_id_list = ['NVD-CWE-Other', 'NVD-CWE-noinfo']
 # List of non-existing CWE IDs
 non_exist_cwe_id_list = [16, 17, 18, 19, 21, 189, 199, 254, 255, 264, 275, 310, 320, 361, 388, 399, 534, 769, 840, 1187]
 
-
-def query_and_preprocess_dataframe(query):
-    # Execute the query and fetch data into a DataFrame
+# Execute the query and fetch data into a DataFrame
+def query_and_preprocess_dataframe(query, vul_flag):
     df = pd.read_sql_query(query, conn)
 
     print("# of total rows before dropping duplicates: ",df.shape[0])
     df = df.drop_duplicates()
     print("# of total rows after dropping duplicates: ",df.shape[0])
 
-    # Assuming `df` is your DataFrame
     for column in df.columns:
         print(f"Column: {column}")
         print("Unique values:", df[column].unique())
@@ -86,14 +85,7 @@ def query_and_preprocess_dataframe(query):
 
     nan_count = df['cwe_id'].isnull().sum()
     print("Number of NaN values in 'cwe_id':", nan_count)
-    if nan_count:
-        # convert values None/NaN to 'non-vulnerable' in cwe_id column
-        df['cwe_id'] = df['cwe_id'].fillna('non-vulnerable')
-        cwe_id_counts = df['cwe_id'].value_counts()
-        print("cwe_id counts:")
-        print(cwe_id_counts)
-
-    # Assuming you have a DataFrame named 'df' and a column named 'cwe_id'
+ 
     for exception_id in exception_id_list:
         count = len(df[df['cwe_id'] == exception_id])
         print("Count of", exception_id, ":", count)
@@ -112,9 +104,12 @@ def query_and_preprocess_dataframe(query):
     unique_values = df['cwe_id'].unique()
     print(unique_values)
 
-    # df['label'] = df['cwe_id'].map(total_cwe_dict)
-    df['vul'] = df['cwe_id'].apply(lambda x: 0 if x == 'non-vulnerable' else 1)
-    df['vul'] = df['vul'].astype(int)
+    if vul_flag:
+        df['vul'] =  1 
+    else:
+        df['vul'] =  0
+        df['cwe_id'] = 0
+    
     vul_counts = df['vul'].value_counts()
 
     print("\nVul counts:")
@@ -127,19 +122,12 @@ def query_and_preprocess_dataframe(query):
 
     return df
 
-vul_df = query_and_preprocess_dataframe(vul_query)
-print("vul_df",vul_df.head(10))
-print(vul_df["vul"].value_counts())
-non_vul_df = query_and_preprocess_dataframe(non_vul_query)
-print("non_vul_df",non_vul_df.head(10))
-print(non_vul_df["vul"].value_counts())
-
+vul_df = query_and_preprocess_dataframe(vul_query, True)
+non_vul_df = query_and_preprocess_dataframe(non_vul_query, False)
 combined_df = pd.concat([vul_df,non_vul_df])
-print("combined_df",combined_df.shape)
 
 # Save to CSV, rows separated by ""
-combined_df.to_csv('data_preproessing/CVEfixes/CVEfixes_new.csv', index=False, lineterminator="")
-combined_df.to_csv('datasets_/CVEfixes_new.csv', index=False, lineterminator="")
+combined_df.to_csv('../../TransVulDet/data_preprocessing/CVEfixes/CVEfixes_new_2.csv', index=False, lineterminator="")
 
 # Close the connection
 conn.close()

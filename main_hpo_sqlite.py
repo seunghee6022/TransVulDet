@@ -11,16 +11,18 @@ import json
 from transformers import TrainingArguments
 import matplotlib.pyplot as plt
 
-from src.trainer import CustomTrainer
+from src.trainer_debug import CustomTrainer
 # from src.dataset import CodeDataset, split_dataframe
 from src.graph import create_graph_from_json
-from src.classifier import get_model_and_tokenizer
+from src.classifier_debug import get_model_and_tokenizer
 from src.callback import EarlyStoppingCallback, WandbCallback, OptunaPruningCallback
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, balanced_accuracy_score
 import optuna
 from optuna.trial import TrialState
 from datasets import load_dataset
 
+import secrets
+import base64
 import random
 import argparse
 import wandb
@@ -39,21 +41,26 @@ def set_seed(args):
         torch.cuda.manual_seed_all(args.seed)
 
 def map_predictions_to_target_labels(predictions, target_to_dimension):
+    # print("predictions",predictions.shape)
     pred_labels = []
+    # print("predictions",len(predictions),predictions)
     for pred in predictions:
         # Find the index of the max softmax probability
         softmax_idx = np.argmax(pred)
+        # print(softmax_idx)
         cwe_id = list(target_to_dimension.keys())[softmax_idx]
+        # print("softmax_idx:",softmax_idx, "pred:",pred, "cwe_id",cwe_id)
         if cwe_id not in list(target_to_dimension.keys()):
             print(f"cwe_id:{cwe_id} is NOT in target_to_dimension!!!!!")
         cwe_target_idx = target_to_dimension[cwe_id]
         pred_labels.append(cwe_target_idx)
+
     return pred_labels
 
 def mapping_cwe_to_target_label(cwe_label, target_to_dimension):
-    # Convert each tensor element to its corresponding dictionary value
-    mapped_labels = [target_to_dimension[int(cwe_id)] for cwe_id in cwe_label]
-    return mapped_labels
+        # Convert each tensor element to its corresponding dictionary value
+        mapped_labels = [target_to_dimension[int(cwe_id)] for cwe_id in cwe_label]
+        return mapped_labels
 
 def get_class_weight(df,target_to_dimension):
     cwe_list = df['assignedclass'].tolist()
@@ -66,19 +73,15 @@ def get_class_weight(df,target_to_dimension):
     class_weights = torch.FloatTensor(weights)
     return class_weights
 
-
-
 # Objective function for Optuna
 def objective(trial, args):
-  
+
     # Suggest hyperparameters
-    lr = trial.suggest_float("learning_rate", 1e-6, 1e-1, log=True)
+    lr = trial.suggest_float("classifier_learning_rate", 1e-5, 1e-1, log=True)
+    classifier_factor = trial.suggest_float("classifier_factor", 1e1, 1e5, log=True)
     weight_decay = trial.suggest_float("weight_decay", 1e-7, 1e-2, log=True)
-    per_device_train_batch_size = trial.suggest_int("per_device_train_batch_size", 1, 32, log=True)
-    classifier_factor = trial.suggest_float("classifier_factor",1, 100, log=True)
-    # loss_weight = trial.suggest_categorical('loss_weight_method', ['default', 'eqaulize', 'descendants','reachable_leaf_nodes'])
-    
-    # args.loss_weight = loss_weight # should remove
+    gradient_accumulation_steps = trial.suggest_int("gradient_accumulation_steps", 1, 32, log=True)
+    per_device_train_batch_size = 32
 
     # Create graph from JSON
     with open(args.node_paths_dir, 'r') as f:
@@ -86,26 +89,26 @@ def objective(trial, args):
    
     # actual targets to be predicted
     prediction_target_uids = [int(key) for key in paths_dict_data.keys()] # 204
+    # print("prediction_target_uids",prediction_target_uids)
+    target_to_dimension = {target:idx for idx,target in enumerate(prediction_target_uids)}
+    # print("target_to_dimension", target_to_dimension)
     graph = create_graph_from_json(paths_dict_data, max_depth=None)
 
     # Define Tokenizer and Model
     num_labels = graph.number_of_nodes() 
-    target_to_dimension = {target:idx for idx,target in enumerate(prediction_target_uids)}
-    print(f"num_all_nodes:{num_labels} num_target_labels: {len(target_to_dimension)}")
-
+    # print(f"num_all_nodes:{num_labels} num_target_labels: {len(target_to_dimension)}")
+   
     # define class weights for focal loss
     df = pd.read_csv('datasets_/combined_dataset.csv')
     class_weights = get_class_weight(df,target_to_dimension)
 
-    # Check if a GPU is available and use it, otherwise, use CPU
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
  
-    model, tokenizer = get_model_and_tokenizer(args, num_labels, prediction_target_uids, graph)
-    # print(model)
+    model, tokenizer = get_model_and_tokenizer(args, prediction_target_uids, graph)
     wandb.watch(model)
 
     # print(model)
-    # unfreeze all parameters of the model
+    # Freeze all parameters of the model
     for param in model.parameters():
         param.requires_grad = True
 
@@ -126,10 +129,10 @@ def objective(trial, args):
     # Load dataset and make huggingface datasts
   
     data_files = {
-    'train': f'{args.train_data_dir}',
-    'validation': f'{args.val_data_dir}',
-    'test': f'{args.test_data_dir}',
-    }
+        'train': f'{args.train_data_dir}',
+        'validation': f'{args.val_data_dir}',
+        'test': f'{args.test_data_dir}',
+        }
     
     dataset = load_dataset('csv', data_files=data_files)
     # Set the transform function for on-the-fly tokenization
@@ -142,25 +145,29 @@ def objective(trial, args):
     print("TRAIN/VAL/TEST SET LENGTHS:",len(train_dataset), len(val_dataset), len(test_dataset))
 
     def compute_metrics(p):
-        # print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
+        print("%%%%%%%%%%%%%%%%INSIDE COMPUTE METRICS")
 
         predictions, labels = p.predictions, p.label_ids
-        print(f"Initial predictions:{len(predictions)}{predictions}")
+        # print("[compute_metrics]p.label_ids before mapping_cwe_to_target_label", p.label_ids)
         labels = mapping_cwe_to_target_label(labels, target_to_dimension)
+        print("[compute_metrics] @@@@@@@ labels [:30]", labels[:30])
         
         if args.use_hierarchical_classifier:
             pred_dist = model.deembed_dist(predictions) # get probabilities of each nodes
+            # print("[if args.use_hierarchical_classifier]pred_dist",pred_dist)
             pred_cwe_labels = model.dist_to_cwe_ids(pred_dist)
+            # print("[if args.use_hierarchical_classifier]pred_cwe_labels",pred_cwe_labels)
             pred_labels = mapping_cwe_to_target_label(pred_cwe_labels, target_to_dimension)
+            print(f"[Hierarchical Classifier]Unique value: {len(set(pred_labels))} @@@@@@@ pred_labels[:30]:{pred_labels[:30]}")
         else:
             # print("predictions", len(predictions), predictions)
             pred_labels = map_predictions_to_target_labels(predictions, target_to_dimension)
-            # print("")
+            print(f"[Normal Classifiacation]{len(set(pred_labels))} @@@@@@@ pred_labels[:30]:{pred_labels[:30]}")
         predictions = pred_labels
 
-        print(f"predictions:{len(predictions)}{predictions}")
-        print(f"labels: {len(labels)}{labels}")
-        precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted', zero_division=0.0, labels=list(target_to_dimension.values()))
+        # print(f"predictions:{len(predictions)}{predictions}")
+        # print(f"labels: {len(labels)}{labels}")
+        precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average=args.eval_metric_average, zero_division=0.0, labels=list(target_to_dimension.values()))
         acc = accuracy_score(labels, predictions)
         balanced_acc = balanced_accuracy_score(labels, predictions)
         return {
@@ -171,18 +178,24 @@ def objective(trial, args):
             'recall': recall
         }
 
-  
-    # data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
-    eval_steps = int(round(args.eval_samples/per_device_train_batch_size, -1))
+    eval_steps = int(round(args.eval_samples/(per_device_train_batch_size*gradient_accumulation_steps), -1))
 
+    # Create the new directory to avoid to save the model checkpoints to the existing folders
+    random_str = base64.b64encode(secrets.token_bytes(12)).decode()
+    args.output_dir = f'{args.output_dir}/{args.study_name}_{random_str}'
+    args.logging_dir = f'{args.logging_dir}/{args.study_name}_{random_str}'
+    os.makedirs(args.output_dir) # exist_ok = False
+    os.makedirs(args.logging_dir) # exist_ok = False
+    
     training_args = TrainingArguments(
         per_device_train_batch_size=per_device_train_batch_size,
-        per_device_eval_batch_size=per_device_train_batch_size,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        per_device_eval_batch_size=32,
         max_steps=eval_steps*args.max_evals,
         weight_decay=weight_decay,
-        logging_dir='./logs',
-        output_dir='./outputs',
+        logging_dir=args.logging_dir,
+        output_dir=args.output_dir,
         evaluation_strategy="steps",
         eval_steps=eval_steps,  
         save_steps=eval_steps,
@@ -199,47 +212,49 @@ def objective(trial, args):
         "betas": (training_args.adam_beta1, training_args.adam_beta2),
         "eps": training_args.adam_epsilon,
     }
-    # Parameters of the base model without the classification head
-    '''
-    To avoid catastropic forgetting --> maybe only fine-tuning RobertaPooler?
-    (pooler): RobertaPooler(
-      (dense): Linear(in_features=768, out_features=768, bias=True)
-      (activation): Tanh()
-    '''
-    # if args.use_hierarchical_classifier:
-    #     base_params = [p for n, p in model.named_parameters() if 'classifier' not in n]
-    #     # base_params = [p for n, p in model.named_parameters() if 'roberta.pooler' in n]
 
-    # else:
-    #     base_params = list(model.model.parameters())
     
-    if args.use_tuning_last_layer:
-        if args.use_hierarchical_classifier:
-            pooler_params = [n for n, p in model.named_parameters() if 'roberta.pooler' in n]
-            base_params = [n for n, p in model.named_parameters() if 'roberta.encoder.layer.11.output' in n]
-            base_params.append(pooler_params)
-            print("base_params Name:\n",base_params)
-            pooler_params = [p for n, p in model.named_parameters() if 'roberta.pooler' in n]
-            base_params = [p for n, p in model.named_parameters() if 'roberta.encoder.layer.11.output' in n]
-            base_params.append(pooler_params)
-    else:
-        base_params = [n for n, p in model.named_parameters() if 'roberta.encoder.layer.11.output' in n]
-        print("base_params Name:\n",base_params)
-        base_params = [p for n, p in model.named_parameters() if 'classifier' not in n]
+
+    '''
+    1. classifier
+    2. pre-trained model + classifier
+    3. last encoder output layer + classifier
+
+    HC --> custom classifier
+
+    12th output layer
+    pooler
+    classifier
+
+    classification model
+    12th output layer
+    default classifier
+
+    '''
     
-    classifier_params = [n for n, p in model.classifier.named_parameters()]
-    print("classifier_params",classifier_params)
-    classifier_params = list(model.classifier.parameters())
-   
     base_lr = lr/classifier_factor
-    classifier_lr = lr
+    if args.debug_mode:
+        optimizer = AdamW(model.parameters(), lr=2e-5)
 
-    optimizer = AdamW([ { "params":  base_params, "lr": base_lr}, {"params": classifier_params, "lr": classifier_lr} ], **adam_kwargs)
+    else:
+        classifier_params = list(model.classifier.parameters())
+        base_params_names = [n for n, p in model.named_parameters() if 'classifier' not in n]
+        # print(base_params_names)
+        base_params = [p for n, p in model.named_parameters() if 'classifier' not in n] 
+        if args.use_bilstm:
+            bilstm_params = list(model.bilstm.parameters())
+            bilistm_lr = trial.suggest_float("BiLSTM_learning_rate", 1e-5, 1e-1, log=True)
+            base_params = list(model.model.parameters())
+            optimizer = AdamW([ { "params":  base_params, "lr": base_lr}, {"params": bilstm_params, "lr": bilistm_lr}, {"params": classifier_params, "lr": lr} ], **adam_kwargs)
+
+        else:
+            optimizer = AdamW([ { "params":  base_params, "lr": base_lr}, {"params": classifier_params, "lr": lr} ], **adam_kwargs)
 
     trainer = CustomTrainer(
         use_hierarchical_classifier = args.use_hierarchical_classifier,
-        use_focal_loss = args.use_focal_loss,
         prediction_target_uids = prediction_target_uids,
+        use_focal_loss = args.use_focal_loss,
+        use_bilstm = args.use_bilstm,
         class_weights = class_weights,
         model=model,
         args=training_args,
@@ -276,29 +291,44 @@ if __name__ == "__main__":
     parser.add_argument('--test-data-dir', type=str, default='datasets_/test_dataset.csv', help='Path to the test dataset directory')
     parser.add_argument('--debug-mode', action='store_true', help='Flag for using small dataset for debug')
     parser.add_argument('--model-name', type=str, default='bert-base-uncased', help='Name of the model to use')
-    parser.add_argument('--num-trials', type=int, default=10, help='Number of trials for Optuna')
-    parser.add_argument('--use-weight-sampling', action='store_true', help='Flag for using weight sampling')
+    parser.add_argument('--num-trials', type=int, default=1, help='Number of trials for Optuna')
+    parser.add_argument('--use-bilstm', action='store_true', help='Flag for BiLSTM with Transformer Model')
+    # parser.add_argument('--use-weight-sampling', action='store_true', help='Flag for using weight sampling')
     parser.add_argument('--use-hierarchical-classifier', action='store_true', help='Flag for hierarchical classification') #--use-hierarchical-classifier --> true
-    parser.add_argument('--use-tuning-last-layer', action='store_true', help='Flag for only fine-tuning pooler layer')
+    parser.add_argument('--use-tuning-last-layer', action='store_true', help='Flag for only fine-tuning pooler layer among base model layers')
+    parser.add_argument('--use-tuning-classifier', action='store_true', help='Flag for only fine-tuning classifier')
     parser.add_argument('--loss-weight', type=str, default='equalize', help="Loss weight type for Hierarchical classification loss, options: 'default', 'equalize', 'descendants','reachable_leaf_nodes'")
     parser.add_argument('--use-focal-loss', action='store_true', help='Flag for using focal loss instead of cross entropy loss')
-    parser.add_argument('--num-train-epochs', type=int, default=5, help='Number of epoch for training')
+    parser.add_argument('--direction', type=str, default='maximize', help='Direction to optimize')
     parser.add_argument('--max-length', type=int, default=512, help='Maximum length for token number')
     parser.add_argument('--seed', type=int, default=42, help='Seed')
     parser.add_argument('--n-gpu', type=int, default=1, help='Number of GPU')
-    parser.add_argument('--study-name', type=str, default='HC_BERT', help='Optuna study name')
-    parser.add_argument('--max-evals', type=int, default=500, help='Maximum number of evaluation steps')
-    parser.add_argument('--eval-samples', type=int, default=9600, help='Number of training samples between two evaluations. It should be divisible by 32')
-    parser.add_argument('--output-dir', type=str, default='outputs', help='HPO output directory')
+    parser.add_argument('--study-name', type=str, default='2311_FT', help='Optuna study name')
+    parser.add_argument('--max-evals', type=int, default=9, help='Maximum number of evaluation steps')
+    parser.add_argument('--eval-samples', type=int, default=40960, help='Number of training samples between two evaluations. It should be divisible by 32')
+    parser.add_argument('--output-dir', type=str, default='./outputs', help='HPO output directory')
+    parser.add_argument('--logging-dir', type=str, default='./logs', help='Trainer log directory')
     parser.add_argument('--eval-metric', type=str, default='f1', help='Evaluation metric')
+    parser.add_argument('--eval-metric-average', type=str, default='macro', help='Evaluation metric average')
 
     # Parse the command line arguments
     args = parser.parse_args()
-    if args.debug_mode:
-        args.study_name = f"{args.study_name}_debug"
-        args.train_data_dir = 'datasets_/2nd_latest_datasets/train_small_data.csv'
-        args.test_data_dir = 'datasets_/2nd_latest_datasets/test_small_data.csv'
-        args.val_data_dir = 'datasets_/2nd_latest_datasets/val_small_data.csv'
+
+    args.study_name = f"{args.study_name}_{args.eval_metric}"
+    # if args.debug_mode:
+    #     args.study_name = f"{args.study_name}_debug"
+    #     args.train_data_dir = 'datasets_/2nd_latest_datasets/train_small_data.csv'
+    #     args.test_data_dir = 'datasets_/2nd_latest_datasets/test_small_data.csv'
+    #     args.val_data_dir = 'datasets_/2nd_latest_datasets/val_small_data.csv'
+
+    if not args.use_tuning_classifier:
+        if args.use_tuning_last_layer:
+            args.study_name = f"{args.study_name}_ll"
+        else:
+            args.study_name = f"{args.study_name}"
+    else:
+        args.study_name = f"{args.study_name}_cls"
+
     if args.use_hierarchical_classifier:
         args.study_name = f"{args.study_name}_{args.loss_weight}"
     else:
@@ -306,13 +336,18 @@ if __name__ == "__main__":
             args.study_name = f"{args.study_name}_FL"
         else:
             args.study_name = f"{args.study_name}_CE"
-    if args.use_tuning_last_layer:
-        args.study_name = f"{args.study_name}_ll"
+
 
     if args.eval_samples%32:
         raise ValueError(f"--eval-samples {args.eval_samples} is not divisible by 32")
 
-    args.study_name = f"{args.study_name}_max_evals{args.max_evals}"
+    args.study_name = f"{args.study_name}_max_evals{args.max_evals}_samples{args.eval_samples}"
+    
+    # define class weights for focal loss
+    # df = pd.read_csv('datasets_/combined_dataset.csv')
+    # args.class_weights = get_class_weight(df)
+    # print(args.class_weights)
+
     print("MAIN - args",args)
 
     set_seed(args)
@@ -320,15 +355,13 @@ if __name__ == "__main__":
     # Initialize a new run
     wandb.init(project="TransVulDet", name=args.study_name)
 
-    print(os.getcwd())
-
     tpeopts = optuna.samplers.TPESampler.hyperopt_parameters()
     tpeopts.update({'n_startup_trials': 8})
 
     # Initialize Optuna study
     study = optuna.create_study(
         study_name=args.study_name,
-        direction="maximize",
+        direction=args.direction,
         pruner=optuna.pruners.HyperbandPruner(
             min_resource=1, max_resource=args.max_evals, reduction_factor=3
         ),
@@ -340,12 +373,12 @@ if __name__ == "__main__":
         
         )
     study.optimize(lambda trial: objective(trial, args), n_trials=args.num_trials, timeout=258500)
-    
+
     # Print results
     print(f"Best trial: {study.best_trial.params}")
     print(f"Best {args.eval_metric}: {study.best_value}")
 
-    location = args.output_dir + "/study.pkl"
+    location = f"{args.output_dir}/study.pkl"
 
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
