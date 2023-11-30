@@ -19,17 +19,19 @@ Pre-trained Transformer-based Language Models
 * CodeBERT
 * GraphCodeBERT
 
-### Model Configurations
-
+### Experiments
+#### Model Configurations
 | Model                             | Loss Function                | Loss Weights                              | Classification Type |
 | --------------------------------- | ---------------------------- | ------------------------------------------ | ------------------- |
 | CodeBERT                          | Cross Entropy, Focal Loss     | Default, Class Weights                   | Non-Hierarchical    |
 | GraphCodeBERT                     | Cross Entropy, Focal Loss     | Default, Class Weights                   | Non-Hierarchical    |
 | CodeBERT with Hierarchical Classifier | BCE (per node)              | Default, Equalize, Descendants, Reachable Leaf Nodes | Hierarchical       |
 | GraphCodeBERT with Hierarchical Classifier | BCE (per node)          | Default, Equalize, Descendants, Reachable Leaf Nodes | Hierarchical       |
-
-
-### Evaluation
+The CodeBERT/GraphCodeBERT with Hierarchical Classifier will be called 'hCodeBERT'/'hGraphCodeBERT' in Result section.
+ 
+ 
+### Result
+#### Evaluation Metrics for Binary/Multiclass Classification Tasks
 *  run `load_best_model_and_compute_metric.py`for both binary/multiclass classification measures at once
 * Binary Classification Metrcs
  * Accuracy
@@ -41,5 +43,36 @@ Pre-trained Transformer-based Language Models
   * Balanced Accuracy
   * Weighted F1-Score
   * Macro F1-Score
+  * 
+ #### Binary Classification Results
+ | Model                           | Accuracy | Precision | Recall | F1-Score |
+|---------------------------------|----------|-----------|--------|----------|
+| CodeBERT-CE                     | 26.08    | 0.00      | 0.00   | 0.00     |
+| GraphCodeBERT-CE                | 26.08    | 0.00      | 0.00   | 0.00     |
+| CodeBERT-FL                     | **73.36**    | 75.92     | **93.67**  | **83.87**    |
+| GraphCodeBERT-FL                | **73.81**    | 76.54     | **93.10**  | **84.01**    |
+| hCodeBERT-default               | 69.62    | **80.00**     | 78.52  | 79.26    |
+| hGraphCodeBERT-default          | 71.74    | 78.18     | 85.68  | 81.76    |
+| hCodeBERT-equalize              | 70.39    | 78.17     | 83.17  | 80.59    |
+| hGraphCodeBERT-equalize         | 69.01    | 78.11     | 80.70  | 79.38    |
+| hCodeBERT-descendants           | 70.26    | 79.93     | 79.81  | 79.87    |
+| hGraphCodeBERT-descendants      | 70.16    | 79.20     | 80.87  | 80.03    |
+| hCodeBERT-reachable_leaf_nodes  | **73.79**    | **80.43**     | 85.30  | 82.79    |
+| hGraphCodeBERT-reachable_leaf_nodes | 69.14    | 79.22     | 78.96  | 79.09    |
+
  
-### Result
+ #### Multiclass Classification Results
+ | Model                            | Accuracy | Balanced Accuracy | Macro F1-Score | Weighted F1-Score |
+|----------------------------------|----------|-------------------|----------------|-------------------|
+| **CodeBERT-CE**                  | **26.08**| 4.76              | 1.97           | 10.79             |
+| **GraphCodeBERT-CE**             | **26.08**| 4.76              | 1.97           | 10.79             |
+| CodeBERT-FL                      | 15.80    | 13.38             | 11.31          | 18.39             |
+| GraphCodeBERT-FL                 | 18.33    | **16.36**         | **13.36**      | 20.53             |
+| hCodeBERT-default                | 20.85    | 11.10             | 11.44          | 20.86             |
+| hGraphCodeBERT-default           | 18.91    | 8.47              | 9.59           | 20.07             |
+| hCodeBERT-equalize               | 20.02    | 12.19             | 11.76          | 19.86             |
+| hGraphCodeBERT-equalize          | 18.37    | 8.50              | 7.51           | 18.05             |
+| **hCodeBERT-descendants**        | **25.34**| **15.05**         | **13.84**      | **23.54**         |
+| hGraphCodeBERT-descendants       | 20.86    | 10.01             | 10.33          | 20.87             |
+| hCodeBERT-reachable_leaf_nodes   | 22.14    | 12.60             | 12.45          | **23.10**         |
+| hGraphCodeBERT-reachable_leaf_nodes | 21.22 | 12.14             | 11.64          | 20.84             |
